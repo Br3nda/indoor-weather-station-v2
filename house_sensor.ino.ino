@@ -1,3 +1,20 @@
+/*   
+ *   Copyright (C) 2016 Paul Campbell
+
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
       // humidity/temp compression - humidity is 7 bits 0-100, temp is 8 bits signed C
       // If bit 7 of byte 0 is 1 then bits 6:0 of byte0 is % humidity, byte1 is temp in C
       // if bit 7 of byte 0 is 0 then bits 6:4 are a signed diff of humidity from previous value, 3:0 are a signed diff of temp from previous value
