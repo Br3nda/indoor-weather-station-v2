@@ -29,7 +29,7 @@
       //  1111 1111 - end of stream (unwritten FLASH)
       //  1111 0000 - time signature
       //  1111 0001 - time signature + change following samples to temp/humidity only (first following sample will be a full sample)
-      //  1111 0010 - time signature + change following samples to pressure only (first following sample will be a full sample)
+      //  1111 0010 - time signature + change following samples to pressure only (first Afollowing sample will be a full sample)
       //  1111 0011 - time signature + change following samples to temp/humidity followed by pressure (first following sample will be a full sample)
       //  1111 0100 - followed by 2 bytes MSB LSB, sampling rate in seconds (default is 60 seconds, one sample per minute)
       //  1111 0101 - followed by 0 terminated string comment
@@ -461,10 +461,23 @@ XinitVariant()
   int dt, dh;
   int sz;
   unsigned char b[4];
+  unsigned short adc;
  // end WARNING
  
  if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE)  // power on go set stuff up
     return 0;
+
+  // ADC:
+  //    1024 - nothing pressed
+  //    369   - top button pressed    - upload data
+  //    677   - bottom button pressed - insert mark in data
+  //    265   - both buttons pressed  - go into setup mode
+  //    
+ adc = system_adc_read();
+ 
+ Serial.print("adc=");  
+ Serial.println(adc);
+
   rtc_mem_read(0, &save_info, sizeof(save_info));  
 //  Serial.println("");  
 //  Serial.print("state=");  
@@ -606,11 +619,28 @@ XinitVariant()
     if (save_info.boff > (RTC_BUFF_SIZE-4)) {  // room for another?
       unload_rtc_buffer(save_info.boff);
     }
+    if (adc > 500 && adc < 900) { // insert mark
+      b[0] = 0xf6; // mark
+      b[1] = 0x0;  // default mark
+      rtc_mem_write(RTC_BUFF_BASE+save_info.boff, &b[0], 2); // save the data
+      save_info.boff += 2;
+      if (save_info.boff > (RTC_BUFF_SIZE-4)) {  // room for another?
+       unload_rtc_buffer(save_info.boff);
+      }
+    }
   }
   save_info.count--;
   rtc_mem_write(0, &save_info, sizeof(save_info));
   if (!save_info.count)
       return 0;
+  // ADC:
+  //    1024 - nothing pressed
+  //    369   - top button pressed    - upload data
+  //    677   - bottom button pressed - insert mark in data
+  //    265   - both buttons pressed  - go into setup mode
+  //    
+  if (adc < 500)  // if 'upload data' or 'go into setup mode' got into setup
+    return 0;
   system_deep_sleep_set_option(0);
   system_deep_sleep(save_info.delay);
 return 1;
@@ -627,13 +657,13 @@ setup() {
   unsigned char v;
 
   Serial.begin(115200);
-Serial.println("");
+  Serial.println("");
   if (XinitVariant()) return;
   // put your setup code here, to run once:
  // Serial.begin(115200);
   Serial.println("");  
   Serial.print(resetInfo.reason);  
-  Serial.print("");  
+  Serial.print(" ");  
   rtc_mem_read(0, &save_info, sizeof(save_info));
   Serial.print(save_info.count);  
   Serial.println(" begin"); 
