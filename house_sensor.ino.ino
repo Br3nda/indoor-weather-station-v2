@@ -738,8 +738,25 @@ smePressure.deactivate();
   //
   //  do any setup() stuff here
   //
-  
-  // 
+  //---------------------------------------------------
+   // ADC:
+  //    1024 - nothing pressed
+  //    369   - top button pressed    - upload data
+  //    677   - bottom button pressed - insert mark in data
+  //    265   - both buttons pressed  - go into setup mode
+  //    
+  {
+      unsigned short adc = system_adc_read();
+      if (adc < 500) { // ignore other cases
+        if (adc < 300) {
+          // go into setup mode
+        } else {
+          // send data up to web server
+        }
+      }
+  }
+
+  // --------------------------------------------------
   //  here we're deep sleeping
   //  if you want to sleep later just return here to break into loop() below, repeat the following 4 lines in loop() and return when you want to deep sleep
   //
