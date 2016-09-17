@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Select a Network</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+
+html, body {
+  font-family: Arial, sans-serif;
+  font-size: 17px;
+  margin:0;
+  height: 100%;
+  background: #f8f8f8;
+  color: #444;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+h1, h2 {
+  color: #7527d8;
+  text-align: center;
+}
+h1 {
+  font-size: 21px;
+  font-weight: normal;
+}
+h2 {
+  font-size: 14px;
+}
+
+.main {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  
+  margin: auto;
+  margin-bottom: 20px;
+}
+
+@media screen and (min-width: 420px) {
+  .main {
+    max-width: 400px;
+  }
+}
+@media screen and (min-height: 400px) {
+  .main {
+    padding-top: 10px;
+  }
+}
+
+.main h1, .main p {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+.main h1 {
+  margin-bottom: 0;
+}
+
+.icon-lock {
+  background: url( 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAxOC4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxvY2siIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4Ig0KCSB2aWV3Qm94PSIwIDAgMjAgMjAiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDIwIDIwIiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxwYXRoIGZpbGw9IiMwMDAiIGQ9Ik0xNS44LDhIMTRWNS42QzE0LDIuNzAzLDEyLjY2NSwxLDEwLDFDNy4zMzQsMSw2LDIuNzAzLDYsNS42VjhINEMzLjQ0Nyw4LDMsOC42NDYsMyw5LjE5OVYxNw0KCWMwLDAuNTQ5LDAuNDI4LDEuMTM5LDAuOTUxLDEuMzA3bDEuMTk3LDAuMzg3QzUuNjcyLDE4Ljg2MSw2LjU1LDE5LDcuMSwxOWg1LjhjMC41NDksMCwxLjQyOC0wLjEzOSwxLjk1MS0wLjMwN2wxLjE5Ni0wLjM4Nw0KCUMxNi41NzEsMTguMTM5LDE3LDE3LjU0OSwxNywxN1Y5LjE5OUMxNyw4LjY0NiwxNi4zNTIsOCwxNS44LDh6IE0xMiw4SDhWNS4xOTlDOCwzLjc1NCw4Ljc5NywzLDEwLDNzMiwwLjc1NCwyLDIuMTk5Vjh6Ii8+DQo8L3N2Zz4NCg==' );
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: .7;
+}
+
+.access-points-container {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-style: solid none;
+}
+
+@media screen and (min-width: 420px) {
+  .access-points-container {
+    border-style: solid;
+    border-radius: 5px;
+    margin-bottom: 10px;
+  }
+}
+
+.access-point {
+  border-top: none;
+  
+  padding: 10px;
+  
+  display: -webkit-flex;
+  display: flex;
+  
+  -webkit-flex-direction: row;
+  flex-direction: row;
+  
+  border-top: 1px solid #ddd;
+  
+  cursor: pointer;
+}
+.access-point:first-of-type {
+  border-top: none;
+}
+
+.access-point-encryption {
+  -webkit-flex: 0 0 22px;
+  flex: 0 0 22px;
+  
+  background-position: left center;
+  
+  height: 15px;
+  margin: 1px 0;
+}
+
+.access-point-ssid {
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  padding-right: 10px;
+}
+
+.access-point-rssi {
+  -webkit-flex: 0 0 6px;
+  flex: 0 0 8px;
+  -webkit-align-self: center;
+  align-self: center;
+  
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  
+  margin-top: 1px;
+  margin-right: 3px;
+  height: 17px;
+}
+
+.access-point-rssi-indicator {
+  display: block;
+  background: #7527d8;
+  margin-top: 1px;
+  flex: 1 1 auto;
+  opacity: 0.2;
+  border-radius: 0px;
+}
+.access-point-rssi-indicator:first-of-type {
+  margin-top: 0;
+  border-radius: 2px 2px 0 0;
+}
+.access-point-rssi-indicator:last-of-type {
+  border-radius: 0 0 2px 2px;
+}
+
+.access-point-rssi-indicator.enabled {
+  opacity: 1;
+}
+
+.passwordScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(66,66,66, 0.8);
+  
+  display: none;
+  
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  
+  justify-content: center;
+  align-items: center;
+}
+.passwordScreen.enabled {
+  display: -webkit-flex;
+  display: flex;
+  animation: 0.3s appear;
+}
+
+@keyframes appear {
+  from { opacity: 0.0; transform: scale(1.2); }
+    to { opacity: 1.0; transform: scale(1.0); }
+}
+
+.passwordScreen h1, .passwordScreen h2 {
+  margin: 0;
+  margin-bottom: 5px;
+}
+
+.dialog {
+  max-width: 400px;
+  margin: 10px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+  padding: 15px 20px;
+}
+
+@media screen and (min-height: 380px) {
+  .dialog {
+    padding: 25px 20px;
+  }
+}
+
+@keyframes jiggle {
+  from { transform: translate(0,0); }
+   25% { transform: translate(-10px ,0); }
+   50% { transform: translate(0,0); }
+   75% { transform: translate(10px,0); }
+    to { transform: translate(0,0); }
+}
+.jiggle {
+  animation: 0.2s jiggle 2;
+}
+
+.dialog input {
+  font-size: 21px;
+  width: 100%;
+  padding: 10px;
+  
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2) inset;
+}
+
+.dialog header {
+  margin-bottom: 20px;
+}
+
+.dialog-buttons {
+  margin-top: 10px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+@media screen and (min-height: 380px) {
+  .dialog-buttons {
+    margin-top: 25px;
+  }
+}
+
+button {
+  background: #7527d8;
+  color: white;
+  font-weight: normal;
+  font-size: 17px;
+  border: none;
+  border-radius: 2px;
+  min-width: 120px;
+  min-height: 40px;
+  padding: 8px 20px;
+  
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 -2px 1px rgba(0, 0, 0, 0.1) inset;
+}
+button[disabled] {
+  background: #888;
+}
+
+button.secondary {
+  border: 1px solid #7527d8;
+  color: #7527d8;
+  background: white;
+  text-shadow: none;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1); 
+}
+    </style>
+  </head>
+  <body>
+  <form method="post" action="storePassword"></form>
+
+  <template id="access-point">
+    <!-- This template is only used by javascript -->
+    <div class="access-point">
+      <div class="access-point-encryption icon-lock"></div>
+      <div class="access-point-ssid">...</div>
+      <div class="access-point-rssi">
+        <div class="access-point-rssi-indicator"></div>
+        <div class="access-point-rssi-indicator"></div>
+        <div class="access-point-rssi-indicator"></div>
+      </div>
+    </div>
+  </template>
+
+  <div class="main">
+    <h1>Station Setup</h1>
+    <p class="status">Choose a network for your weather station to connect to&hellip;</p>
+
+    <div class="access-points-container">
+      <!-- access points get put in here -->
+      Loading&hellip;
+    </div>
+  </div>
+  
+  <div class="passwordScreen" onClick="onClickSneezeguard(event);">
+    <div class="dialog">
+      <header>
+        <h1>Enter WiFi Password</h1>
+        <h2 class="network-name">Surveillance Van #5</h2>
+      </header>
+      <div><input type="password" class="passwordInput" placeholder="Password" /></div>
+      <footer>
+        <div class="dialog-buttons"><button class="secondary" onClick="cancelPasswordScreen(event);">Cancel</button><button class="submitButton" onClick="submitPasswordScreen(event);">OK</button></div>
+      </footer>
+    </div>
+  </div>
+  
+<script>
+// Setup error handling immediately
+window.addEventListener('error', function(e) {
+  $$(".status").textContent = "Whoops, something went wrong. Reset your weather station and try again. ";
+  $$(".status").textContent += "The nerdy details: \"" + e.message + "\"";
+  $$(".access-points-container").style.display = "none";
+});
+</script>
+
+<script>
+var $ = document.querySelectorAll.bind(document);
+var $$ = document.querySelector.bind(document);
+
+var accessPointTpl = $$('#access-point');
+
+var activeSsid;
+
+function onClickSneezeguard(e) {
+  if (e.target == $$(".passwordScreen")) {
+    e.stopPropagation();
+    cancelPasswordScreen();
+  }
+}
+
+function cancelPasswordScreen() {
+  var passwordScreen = $$(".passwordScreen");
+  passwordScreen.querySelector(".passwordInput").value = "";
+  passwordScreen.classList.remove('enabled');
+}
+
+function submitPasswordScreen() {
+  // Called when user clicks OK.
+  var passwordScreen = $$(".passwordScreen");
+  var passwordInput = passwordScreen.querySelector(".passwordInput");
+  var password = passwordInput.value;
+  
+  if (password.length == 0) {
+    passwordInput.classList.add("jiggle");
+    setTimeout(function() { 
+      return passwordInput.classList.remove("jiggle")
+    }, 500);
+    return;
+  }
+
+  submitAP(activeSsid, password);
+  
+  var submitButton = passwordScreen.querySelector(".submitButton");
+  submitButton.textContent = "Working...";
+  submitButton.disabled = true;
+  
+  setTimeout(function() {
+    submitButton.textContent = "OK";
+    submitButton.disabled = false;
+  }, 1000);
+
+}
+
+function submitAP(ssid, password) {
+  var s = document.createElement("input");
+  s.name = "ssid";
+  s.value = ssid;
+
+  var p = document.createElement("input");
+  p.name = "pass";
+  p.value = password;
+
+  var f = document.forms[0];
+  f.appendChild(s);
+  f.appendChild(p);
+  f.submit();
+}
+
+function onClickAP() {
+  var ssid = this.dataset.ssid;
+  var encrypted = this.dataset.encrypted;
+  if (encrypted) {
+    activeSsid = ssid; // store this globally for submitting later
+    var passwordScreen = $$(".passwordScreen");
+    passwordScreen.querySelector(".network-name").textContent = ssid;
+    passwordScreen.classList.add('enabled');
+    
+    // Focussing the password field makes sense, but on small screens
+    // it can cause the context (instructions/buttons) to be obscured.
+    // passwordScreen.querySelector(".passwordInput").focus();
+  } else {
+    submitAP(ssid);
+  }
+}
+
+function loadData(knownAPs) {
+  var container = $$('.access-points-container');
+  while (container.firstChild) {
+    container.firstChild.removeEventListener('click', onClickAP);
+    container.removeChild(container.firstChild);
+  }
+  
+  if(!knownAPs) {
+      console.log("loadData with knownAPs empty");
+      return;
+  }
+
+  knownAPs.sort(function(a,b) { 
+    return b.rssi - a.rssi
+  }).map(function(x) {
+    var rootElement = document.importNode(accessPointTpl.content, true).children[0];
+    
+    rootElement.querySelector('.access-point-ssid').textContent = x.ssid;
+    rootElement.querySelector('.access-point-encryption').classList.toggle('icon-lock', x.encryptionType.length)
+    var indicators = rootElement.querySelectorAll('.access-point-rssi-indicator');
+    indicators[2].classList.toggle('enabled', x.rssi > -80);
+    indicators[1].classList.toggle('enabled', x.rssi > -65);
+    indicators[0].classList.toggle('enabled', x.rssi > -50);
+    
+    rootElement.dataset['ssid'] = x.ssid;
+    
+    if (x.encryptionType.length)
+      rootElement.dataset['encrypted'] = "true"; 
+    
+    rootElement.addEventListener('click', onClickAP);
+    
+    return rootElement;
+  }).forEach(function(x) {
+    return container.appendChild(x);
+  } );
+  
+}
+</script>
+<script>
+
+// Fetches JSON object from the server
+// Array of APs
+// ssid: String
+// rssi: Number, integer -something to 0
+// encryptionType: String, "" | *
+function refreshData() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "http://192.168.1.1/getAPs", true);
+    xhr.responseType = "json";
+    xhr.onload = function() {
+      if (xhr.status == 200) {
+        loadData(xhr.response);
+      } else {
+        console.log("Got bad response in JSON request");
+      }
+    };
+    xhr.send();
+}
+
+refreshData();
+
+setInterval( refreshData, 5000 );
+
+</script>
+
+  </body>
+</html>

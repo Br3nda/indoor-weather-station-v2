@@ -56,6 +56,7 @@ extern "C" {
 #include "HTS221.h"
 #include "LPS25H.h"
 #include "PC8563.h"
+#include "CaptiveConfig.h"
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -100,6 +101,23 @@ rtc_info save_info;
 
 #define HTS221_ADDRESS     0x5F
 #define LPS25H_ADDRESS     0x5C
+
+/// A CaptiveConfig is allocated in setup() if we want a config access point.
+CaptiveConfig *configGetter(nullptr);
+
+// Unsure why, but Arduino precompiler thingy wants to put enter_deep_sleep()
+// before rtc_mem_write...
+void rtc_mem_write(int offset, void *p,  int bytes);
+
+/// Call this, then return from setup() or loop() to enter deep sleep
+void enter_deep_sleep()
+{
+  rtc_mem_write(0, &save_info, sizeof(save_info));
+  system_deep_sleep_set_option(0);
+  system_deep_sleep(save_info.delay);
+  esp_yield();
+}
+
 void
 rtc_mem_write(int offset, void *p,  int bytes)
 {
@@ -146,6 +164,7 @@ rtc_mem_write(int offset, void *p,  int bytes)
     *rtc = b.l;
   }
 }
+
 
 void
 rtc_mem_read(int offset, void *p,  int bytes)
@@ -651,7 +670,6 @@ return 1;
   // it will be something like "addi    a1, a1, -48" take the '48' or whatever from here and replace it in the asm above (twice)
 }
 
-
 void 
 setup() {
   unsigned char v;
@@ -749,25 +767,33 @@ smePressure.deactivate();
       unsigned short adc = system_adc_read();
       if (adc < 500) { // ignore other cases
         if (adc < 300) {
-          // go into setup mode
+          // Both buttons pressed
+          Serial.println("Starting captive config.");
+          configGetter = new CaptiveConfig();
+
+          return; // This return without enter_deep_sleep() means "go to loop()"
         } else {
-          // send data up to web server
+          Serial.println("Want to upload data.");
+
+          // TODO: Get WiFi credentials from flash, connect, upload data, etc.
         }
       }
   }
 
-  // --------------------------------------------------
-  //  here we're deep sleeping
-  //  if you want to sleep later just return here to break into loop() below, repeat the following 4 lines in loop() and return when you want to deep sleep
-  //
-  rtc_mem_write(0, &save_info, sizeof(save_info));
-  system_deep_sleep_set_option(0);
-  system_deep_sleep(save_info.delay);
-  esp_yield();
+  enter_deep_sleep();
 }
 
 void 
 loop() {
+    if( configGetter ) {
+        if( configGetter->haveConfig() ) {
+            Serial.println("Got config");
 
+            // TODO: Do something useful with the configuration
 
+            delete configGetter;
+            configGetter = nullptr;
+            enter_deep_sleep();
+        }
+    }
 }
