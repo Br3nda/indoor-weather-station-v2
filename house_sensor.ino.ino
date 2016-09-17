@@ -105,6 +105,16 @@ rtc_info save_info;
 /// A CaptiveConfig is allocated in setup() if we want a config access point.
 CaptiveConfig *configGetter(nullptr);
 
+/// Used to confirm that device knows user wants to do something
+uint8_t blinkCount(0);
+
+/// Blinking is handled in loop(), undone by enter_deep_sleep()
+void startBlink()
+{
+    pinMode(2, OUTPUT);
+    blinkCount = 0x80;
+}
+
 // Unsure why, but Arduino precompiler thingy wants to put enter_deep_sleep()
 // before rtc_mem_write...
 void rtc_mem_write(int offset, void *p,  int bytes);
@@ -112,6 +122,10 @@ void rtc_mem_write(int offset, void *p,  int bytes);
 /// Call this, then return from setup() or loop() to enter deep sleep
 void enter_deep_sleep()
 {
+  // Ensure that the notification LED is off before we go to sleep
+  blinkCount = 0;
+  digitalWrite(2, 1);
+
   rtc_mem_write(0, &save_info, sizeof(save_info));
   system_deep_sleep_set_option(0);
   system_deep_sleep(save_info.delay);
@@ -769,6 +783,7 @@ smePressure.deactivate();
         if (adc < 300) {
           // Both buttons pressed
           Serial.println("Starting captive config.");
+          startBlink();
           configGetter = new CaptiveConfig();
 
           return; // This return without enter_deep_sleep() means "go to loop()"
@@ -785,6 +800,10 @@ smePressure.deactivate();
 
 void 
 loop() {
+    if(blinkCount) {
+        digitalWrite(2, !(--blinkCount & 0x10) );
+    }
+
     if( configGetter ) {
         if( configGetter->haveConfig() ) {
             Serial.println("Got config");
@@ -794,6 +813,8 @@ loop() {
             delete configGetter;
             configGetter = nullptr;
             enter_deep_sleep();
+        } else {
+            delay(15);
         }
     }
 }
