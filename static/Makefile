@@ -1,8 +1,8 @@
 # Haven't considered any sort of minifying yet.
 
-XXD=/usr/bin/XXD
-GZIP=/usr/bin/gzip
-SED=/usr/bin/sed
+XXD=xxd
+GZIP=gzip
+SED=sed
 
 network-selector.h: network-selector.html
 	${GZIP} < $< > network-selector.html.gz
