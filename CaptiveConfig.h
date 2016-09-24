@@ -3,6 +3,8 @@
 
 #include <IPAddress.h>
 
+#include "HouseSensor.h"
+
 class ESP8266WebServer;
 class DNSServer;
 
@@ -18,14 +20,6 @@ struct APType
     String ssid;
     int32_t rssi; // Signal strength
     uint8_t encryptionType; // = ENC_TYPE_NONE for open networks
-};
-
-
-/// For returning the SSID and Passphrase input by the user
-struct APCredentials
-{
-    String ssid;
-    String passphrase;
 };
 
 
