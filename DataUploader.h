@@ -14,7 +14,10 @@
 class DataUploader
 {
     public:
+        /// preferredAP is the set of credentials input by the user
         DataUploader(APCredentials *preferredAP = nullptr);
+
+        /// Puts the WiFi in to sleep mode
         ~DataUploader();
 
         /// Advances state machine, returns true when we're done
@@ -24,6 +27,7 @@ class DataUploader
         bool succeeded() const;
 
     protected:
+        /// Advance to next AP from staticAPs, or set state to failure.
         void tryNextAp();
 
         static void wifiConnectCb(const WiFiEventStationModeConnected &);

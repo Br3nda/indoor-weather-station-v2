@@ -77,6 +77,7 @@ bool DataUploader::isDone()
                     return false;
 
                 case WL_DISCONNECTED: // In this state while connecting
+                    // TODO: Need a timeout so we don't keep trying a nonexistant AP forever.
                 default:
                     return false;
             }
