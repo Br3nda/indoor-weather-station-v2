@@ -106,6 +106,7 @@ class CaptiveConfig
         /// Sends a 302 redirect to "http://setup/" (the main config page)
         static void serveRedirect();
 
+        /// For callbacks, static functions, etc.
         static CaptiveConfig *instance;
 
         APCredentials *pickedCreds;

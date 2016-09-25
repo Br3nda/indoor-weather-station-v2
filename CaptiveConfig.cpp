@@ -12,11 +12,11 @@
 CaptiveConfig * CaptiveConfig::instance(nullptr);
 
 CaptiveConfig::CaptiveConfig() :
+    state(CaptiveConfigState::START_SCANNING),
     configHTTPServer(nullptr),
     configDNSServer(nullptr),
-    pickedCreds(nullptr),
-    state(CaptiveConfigState::START_SCANNING),
-    numAPsFound(0)
+    numAPsFound(0),
+    pickedCreds(nullptr)
 {
     assert(instance == nullptr);
     instance = this;
