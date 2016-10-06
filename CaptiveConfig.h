@@ -3,6 +3,8 @@
 
 #include <IPAddress.h>
 
+#include "HouseSensor.h"
+
 class ESP8266WebServer;
 class DNSServer;
 
@@ -18,14 +20,6 @@ struct APType
     String ssid;
     int32_t rssi; // Signal strength
     uint8_t encryptionType; // = ENC_TYPE_NONE for open networks
-};
-
-
-/// For returning the SSID and Passphrase input by the user
-struct APCredentials
-{
-    String ssid;
-    String passphrase;
 };
 
 
@@ -112,6 +106,7 @@ class CaptiveConfig
         /// Sends a 302 redirect to "http://setup/" (the main config page)
         static void serveRedirect();
 
+        /// For callbacks, static functions, etc.
         static CaptiveConfig *instance;
 
         APCredentials *pickedCreds;

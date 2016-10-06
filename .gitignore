@@ -1,0 +1,8 @@
+# Vim temporary files
+*~
+*.swp
+
+# Automatically generated header for captive config
+static/network-selector.h
+static/network-selector.html.gz
+
