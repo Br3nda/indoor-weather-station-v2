@@ -71,7 +71,8 @@ extern "C" {
 
 
 typedef struct rtc_info {
-    unsigned long delay;    // how long to wait for 
+    unsigned char magic;    // MAGIC number
+#define MAGIC 0x47          //    increment this when you make changes to force initialisation
     unsigned char count;    // how many times to wait
     unsigned char state;    
 #define STATE_HUMID_PRESENT     0x01    // we have a humididty sensor
@@ -83,6 +84,7 @@ typedef struct rtc_info {
     unsigned char   compressor_state;   //
 #define CSTATE_SAME       0x01          // we have an active 'same' entry
 #define CSTATE_LAST_SAME  0x02          // the last entry we put was deltas '0'
+    unsigned long   delay;    // how long to wait for 
     unsigned short  last_pressure;      // 0xffff means no last value
     signed char     last_temp;          // 0x7f means no last value
     unsigned char   last_humidity;      // 0xff means no last value
@@ -508,13 +510,15 @@ XinitVariant()
   //    
  adc = system_adc_read();
  
- Serial.print("adc=");  
- Serial.println(adc);
+// Serial.print("adc=");  
+// Serial.println(adc);
 
   rtc_mem_read(0, &save_info, sizeof(save_info));  
 //  Serial.println("");  
 //  Serial.print("state=");  
 //  Serial.println(save_info.state,HEX);
+  if (save_info.magic != MAGIC)
+    return 0;
   if (save_info.state&STATE_SENSORS_ACTIVE) {
     force=0;
     same=0;
@@ -699,10 +703,11 @@ setup() {
   rtc_mem_read(0, &save_info, sizeof(save_info));
   Serial.print(save_info.count);  
   Serial.println(" begin"); 
-  if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE) {
+  if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE || save_info.magic != MAGIC) {  // system powerup reset
     bool humidityPresent, pressurePresent;
 
     memset(&save_info, 0, sizeof(save_info));
+    save_info.magic = MAGIC;
     Serial.println("VCW sensor");
     Wire.begin(4, 5);
     Serial.println("start humidity");
