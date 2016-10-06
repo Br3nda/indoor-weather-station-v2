@@ -45,6 +45,9 @@
       //  byte3 - bits 7:4 minutes lsb 0-59, bits 3:0 - F means byte4 not included, otherwise undefined, set to 0
       //  byte4 - bits 7:6 undefined set to 0, bits 5:0 seconds
 
+#define COUNT 60            // how many samples before trying to push upstream
+#define DELAY 1000000       // 1 SEC in uS
+#define MAGIC 0x48          // increment this (mod 256) when you make changes to force initialisation
 
 extern "C" {
   #include "user_interface.h"
@@ -57,7 +60,6 @@ extern "C" {
 #include "LPS25H.h"
 #include "PC8563.h"
 #include "CaptiveConfig.h"
-#include "DataUploader.h"
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -73,7 +75,6 @@ extern "C" {
 
 typedef struct rtc_info {
     unsigned char magic;    // MAGIC number
-#define MAGIC 0x47          //    increment this when you make changes to force initialisation
     unsigned char count;    // how many times to wait
     unsigned char state;    
 #define STATE_HUMID_PRESENT     0x01    // we have a humididty sensor
@@ -107,8 +108,6 @@ rtc_info save_info;
 
 /// A CaptiveConfig is allocated in setup() if we want a config access point.
 CaptiveConfig *configGetter(nullptr);
-/// Similarly, DataUploader is used for uploading data over WiFi
-DataUploader *dataUploader(nullptr);
 
 /// Used to confirm that device knows user wants to do something
 uint8_t blinkCount(0);
@@ -751,7 +750,7 @@ setup() {
 
     save_info.state |= STATE_TIME_SET|STATE_RTC_PRESENT;
     write_time_signature();
-    save_info.delay = 1000000;   // 1 sec
+    save_info.delay = DELAY;   // 1 sec
   } else {
      dump_rtc_data();
      save_info.boff = 0;
@@ -760,7 +759,7 @@ setup() {
      save_info.last_pressure = 0;
      write_time_signature();
   }
-  save_info.count = 60;
+  save_info.count = COUNT;
 #ifdef NOTDEF
 smeHumidity.begin();
 smePressure.begin();
@@ -796,14 +795,9 @@ smePressure.deactivate();
 
           return; // This return without enter_deep_sleep() means "go to loop()"
         } else {
-          // Top button pressed
           Serial.println("Want to upload data.");
 
-          // TODO: Get WiFi credentials from flash, actually upload data
-          APCredentials pretendFromFlash{"a ssid", "a password"};
-          dataUploader = new DataUploader(&pretendFromFlash);
-
-          return; // This return without enter_deep_sleep() means "go to loop()"
+          // TODO: Get WiFi credentials from flash, connect, upload data, etc.
         }
       }
   }
@@ -817,8 +811,6 @@ loop() {
         digitalWrite(2, !(--blinkCount & 0x10) );
     }
 
-    // Note that we shouldn't have both a configGetter and
-    // a dataUploader active at the same time.
     if( configGetter ) {
         if( configGetter->haveConfig() ) {
             Serial.println("Got config");
@@ -828,26 +820,8 @@ loop() {
             delete configGetter;
             configGetter = nullptr;
             enter_deep_sleep();
-            return;
+        } else {
+            delay(15);
         }
-        delay(15);
-    } else if( dataUploader ) {
-        if( dataUploader->isDone() ) {
-            Serial.print("Uploader done...");
-
-            if( dataUploader->succeeded() ) {
-            // TODO: Do something useful
-                Serial.println("Success!");
-            } else {
-            // TODO: Do something useful
-                Serial.println("Failed!");
-            }
-
-            delete dataUploader;
-            dataUploader = nullptr;
-            enter_deep_sleep();
-            return;
-        }
-        delay(15);
     }
 }
