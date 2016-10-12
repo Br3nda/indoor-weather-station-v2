@@ -650,13 +650,15 @@ setup() {
     save_info.delay = DELAY;   // 1 sec
     save_info.count = COUNT;
   } else {
+#ifdef NOTDEF
     for (int i = 0; i < save_info.boff; i++){
       unsigned char c;
       rtc_mem_read(RTC_BUFF_BASE+i, &c, 1);
       Serial.print(c, HEX);
-     Serial.print(" ");
+      Serial.print(" ");
     }
     Serial.println(" ");
+#endif
     int samples = dump_rtc_data();
      Serial.print(samples);
      Serial.print(" samples in ");

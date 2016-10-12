@@ -90,7 +90,7 @@ dump_rtc_data(void)
   tm.second = 0;
   for (i = 0; ;) {
     c = get_compressed_byte(i);
-printf("C=%x\n",c);
+//printf("C=%x\n",c);
     i++;
     if ((c&0xf0) == 0xf0) {
       if (c == 0xff)
