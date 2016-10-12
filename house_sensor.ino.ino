@@ -48,7 +48,7 @@
 
 #define COUNT 60            // how many samples before trying to push upstream
 #define DELAY 1000000       // 1 SEC in uS
-#define MAGIC 0x54          // increment this (mod 256) when you make changes to force initialisation
+#define MAGIC 0x67          // increment this (mod 256) when you make changes to force initialisation
 
 extern "C" {
   #include "user_interface.h"
@@ -293,7 +293,7 @@ write_time_signature()
 
       memset(&tm, 0, sizeof(tm));
       PC8563_RTC.read(tm);
-      b[1] = tm.year;
+      b[1] = tm.year-2000;
       b[2] = (tm.month<<4) | (tm.day>>1);
       b[3] = (tm.day<<7) | (tm.hour<<2) | (tm.minute>>4);
       b[4] = (tm.minute<<4) | 0xf;
@@ -587,6 +587,24 @@ void log_data(time_stamp *t, unsigned char valid_th, int temp, int humidity, uns
   Serial.println();
 }
 
+void
+write_time(int year,int month, int day, int hour, int minute, int second)
+{
+  if (save_info.state&STATE_RTC_PRESENT) {
+    pc_time tm;
+
+    tm.second = second;
+    tm.minute = minute;
+    tm.hour = hour;
+    tm.day = day;
+    tm.month = month;
+    tm.year = year;
+    save_info.state |= STATE_TIME_SET;
+    PC8563_RTC.write(tm);
+    write_time_signature();
+  }
+}
+
 void 
 setup() {
   unsigned char v;
@@ -639,14 +657,14 @@ setup() {
     if (!PC8563_RTC.begin()) {
       Serial.println("- NO PC8563 RTC found");
     } else {
-      save_info.state |= STATE_RTC_PRESENT;
+      save_info.state |= STATE_RTC_PRESENT; 
     }
     if (save_info.state&(STATE_PRESSURE_PRESENT|STATE_HUMID_PRESENT))
       save_info.state |= STATE_SENSORS_ACTIVE;
 
 
-    save_info.state |= STATE_TIME_SET|STATE_RTC_PRESENT;
-    write_time_signature();
+    save_info.state |= STATE_TIME_SET|STATE_RTC_PRESENT; // remove this when we have a working time load thing
+    write_time(2016, 1, 1, 0, 0, 0);
     save_info.delay = DELAY;   // 1 sec
     save_info.count = COUNT;
   } else {
