@@ -47,7 +47,7 @@
 
 #define COUNT 60            // how many samples before trying to push upstream
 #define DELAY 1000000       // 1 SEC in uS
-#define MAGIC 0x48          // increment this (mod 256) when you make changes to force initialisation
+#define MAGIC 0x4d          // increment this (mod 256) when you make changes to force initialisation
 
 extern "C" {
   #include "user_interface.h"
@@ -60,6 +60,7 @@ extern "C" {
 #include "LPS25H.h"
 #include "PC8563.h"
 #include "CaptiveConfig.h"
+#include "decompress.h"
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -281,12 +282,14 @@ write_time_signature()
     unsigned char b[6];
 
     save_info.compressor_state = 0;
-    if (save_info.boff > (RTC_BUFF_SIZE-6)) {  // room for another?
+    if (save_info.boff > (RTC_BUFF_SIZE-6-(save_info.delay==60000000?0:3))) {  // room for another?
       unload_rtc_buffer(save_info.boff);
     }
     b[0] = 0xf0 | (save_info.state&STATE_HUMID_PRESENT?1:0) | (save_info.state&STATE_PRESSURE_PRESENT?2:0);
     if ((save_info.state&(STATE_RTC_PRESENT|STATE_TIME_SET)) == (STATE_RTC_PRESENT|STATE_TIME_SET)) {
       pc_time tm;
+
+      memset(&tm, 0, sizeof(tm));
       PC8563_RTC.read(tm);
       b[1] = tm.year;
       b[2] = (tm.month<<4) | (tm.day>>1);
@@ -299,185 +302,27 @@ write_time_signature()
       rtc_mem_write(RTC_BUFF_BASE+save_info.boff, &b[0], 2); // save the data
       save_info.boff += 2;
     }
+    if (DELAY!=60000000) { // not 1 minute? output sampling rate
+      int v = DELAY/1000000;
+      b[0] = 0xf4;
+      b[1] = v>>8;
+      b[2] = v;
+      rtc_mem_write(RTC_BUFF_BASE+save_info.boff, &b[0], 3); // save the data
+      save_info.boff += 3;
+    }
     if (save_info.boff > (RTC_BUFF_SIZE-4))   // room for another?
       unload_rtc_buffer(save_info.boff);
 }
 
-void
-dump_rtc_data()
+int 
+get_compressed_byte(int offset) // called when dumping rtc contents
 {
-  int i;
-  unsigned char stream_type=0;
-  int last_temp, last_pressure, last_humidity;
-  unsigned char b[5];
-  unsigned char c=0x66;
-  int samples=0;
-
-//Serial.print("state=0x");Serial.println(save_info.state,HEX);
-//Serial.print("boff=");Serial.println(save_info.boff,HEX);
-
-//for (i = 0; i < save_info.boff;i++) {rtc_mem_read(RTC_BUFF_BASE+i, &c, 1);Serial.print(c,HEX);Serial.print(" ");}
-//Serial.println("");
-
-   for (i = 0; i < save_info.boff;) {
-    rtc_mem_read(RTC_BUFF_BASE+i, &c, 1);
-//Serial.print(i);
-//Serial.print(": ");
-//Serial.println(c,HEX);
-    i++;
-    if ((c&0xf0) == 0xf0) {
-      if (c == 0xff)
-          break;
-      switch (c&0xf) {
-      case 0:
-      case 1:
-      case 2:
-      case 3:
-        stream_type = c&0x3;
-        rtc_mem_read(RTC_BUFF_BASE+i, &b[0], 5);
-        i += (b[0]==0xff?1:(b[3]&0xf)==0xf?4:5);
-        if (b[0]==0xff) {
-            Serial.println("Date: unknown");
-            Serial.println("Time: unknown");
-            break;
-        }
-        Serial.print("Date: ");
-        Serial.print(((b[1]&0xf)<<1)|((b[2]>>7)&1));
-        Serial.print("/");
-        Serial.print(b[1]>>4);
-        Serial.print("/");
-        Serial.println(b[0]+2000);
-        Serial.print("Time: ");
-        Serial.print((b[2]>>2)&0x1f);
-        Serial.print(":");
-        if ((b[3]&0xf)==0xf) {
-          Serial.println(((b[2]&3)<<4)|(b[3]>>4));
-        } else {
-           Serial.print(((b[2]&3)<<4)|(b[3]>>4));
-           Serial.print(":");
-           Serial.println(b[4]&0x3f);
-        }
-        break;
-      case 4:
-        rtc_mem_read(RTC_BUFF_BASE+i, &b[0], 2);
-        i += 2;
-        Serial.print("Data rate: ");
-        Serial.print((b[0]<<8)|b[1]);
-        Serial.println(" seconds/sample");
-        break;
-      case 5:
-        Serial.print("Comment: ");
-        for (;;) {
-            char ch;
-            
-            rtc_mem_read(RTC_BUFF_BASE+i, &ch, 1);
-            i++;
-            if (ch == 0 || ch == 0xff)
-              break;
-            Serial.print(ch);
-        }
-        Serial.println("");
-        break;
-      case 6:
-        rtc_mem_read(RTC_BUFF_BASE+i, &b[0], 1);
-        i++;
-        Serial.print("Mark: ");
-        Serial.println(b[0]);
-        break;
-      case 7: // null
-        break;
-      case 8:
-        rtc_mem_read(RTC_BUFF_BASE+i, &b[0], 1);
-        i++;
-        if (stream_type == 0) {
-            Serial.println("No data type specified - quitting");
-            i = save_info.boff;
-            break;
-        }
-        while (b[0]--) {
-          samples++;
-          if (stream_type&1) {
-            Serial.print(last_temp);
-            Serial.print(" ");
-            Serial.print(last_humidity);
-            if (stream_type&2) {
-              Serial.print(" ");
-            } else {
-              Serial.println("");
-            }
-          }
-          if (stream_type&2) 
-            Serial.println(last_pressure);
-        }
-        break;
-      default:
-        Serial.print("Invalid escape code - ");
-        Serial.println(c,HEX);
-        i = save_info.boff;
-        break;
-      }
-    } else {
-        if (stream_type == 0) {
-            Serial.println("No data type specified - quitting");
-            break;
-        }
-        samples++;
-        if (!(c&0x80)) { // delta?
-          if (stream_type&1) {
-            int d=c&0xf;
-            if (d&0x8) 
-              d |= 0xfffffff0;
-            last_temp += d;
-            d=(c>>4)&0x7;
-            if (d&0x4) 
-              d |= 0xfffffff8;
-            last_humidity += d;
-            Serial.print(last_temp);
-            Serial.print(" ");
-            Serial.print(last_humidity);
-            if (stream_type&2) {
-              Serial.print(" ");
-              rtc_mem_read(RTC_BUFF_BASE+(i++), &c, 1);
-            } else {
-              Serial.println("");
-            } 
-          }
-          if (stream_type&2) {
-            int d=c;
-            if (d&0x40) 
-              d |= 0xffffff80;
-            last_pressure += d;
-            Serial.println(last_pressure); 
-          }
-        } else {
-          if (stream_type&1) {
-            last_humidity = c&0x7f;
-            rtc_mem_read(RTC_BUFF_BASE+(i++), &b[0], 1);
-            last_temp = b[0];
-            if (last_temp&0x80)
-              last_temp |= 0xffffff00;
-            Serial.print(last_temp);
-            Serial.print(" ");
-            Serial.print(last_humidity);
-            if (stream_type&2) {
-              Serial.print(" ");
-              rtc_mem_read(RTC_BUFF_BASE+(i++), &c, 1);
-            } else {
-              Serial.println("");
-            }
-          }
-          if (stream_type&2) {
-            rtc_mem_read(RTC_BUFF_BASE+(i++), &b[1], 1);
-            last_pressure = ((c&0x7f)<<8)|b[1];
-            Serial.println(last_pressure);
-          }
-        }
-    }
-  }
-  Serial.print(samples);
-  Serial.print(" samples in ");
-  Serial.print(save_info.boff);
-  Serial.println(" bytes");
+  unsigned char c;
+  
+  if (offset >= save_info.boff)
+    return -1;
+  rtc_mem_read(RTC_BUFF_BASE+offset, &c, 1);
+  return c;
 }
 
 bool
@@ -522,6 +367,15 @@ XinitVariant()
   if (save_info.magic != MAGIC)
     return 0;
   if (save_info.state&STATE_SENSORS_ACTIVE) {
+    if (adc > 500 && adc < 900) { // insert mark
+      b[0] = 0xf6; // mark
+      b[1] = 0x0;  // default mark
+      rtc_mem_write(RTC_BUFF_BASE+save_info.boff, &b[0], 2); // save the data
+      save_info.boff += 2;
+      if (save_info.boff > (RTC_BUFF_SIZE-4)) {  // room for another?
+       unload_rtc_buffer(save_info.boff);
+      }
+    }
     force=0;
     same=0;
       // activate internal pullups for twi.
@@ -658,15 +512,6 @@ XinitVariant()
     if (save_info.boff > (RTC_BUFF_SIZE-4)) {  // room for another?
       unload_rtc_buffer(save_info.boff);
     }
-    if (adc > 500 && adc < 900) { // insert mark
-      b[0] = 0xf6; // mark
-      b[1] = 0x0;  // default mark
-      rtc_mem_write(RTC_BUFF_BASE+save_info.boff, &b[0], 2); // save the data
-      save_info.boff += 2;
-      if (save_info.boff > (RTC_BUFF_SIZE-4)) {  // room for another?
-       unload_rtc_buffer(save_info.boff);
-      }
-    }
   }
   save_info.count--;
   rtc_mem_write(0, &save_info, sizeof(save_info));
@@ -688,6 +533,48 @@ return 1;
   // change '64' to match how much space gets allocated for this routine - '16' for the stack frame  
   // to find out the value run objdump on the resulting elf file, find the second line of initVariant()
   // it will be something like "addi    a1, a1, -48" take the '48' or whatever from here and replace it in the asm above (twice)
+}
+
+void 
+log_time(time_stamp *t) 
+{
+  if (t->valid) {
+    Serial.print("Date: ");
+    Serial.print(t->day);
+    Serial.print("/");
+    Serial.print(t->month);
+    Serial.print("/");
+    Serial.print(t->year);
+    Serial.print(" ");
+    Serial.print(t->hour);
+    Serial.print(":");
+    Serial.print(t->minute);
+    Serial.print(":");
+    Serial.print(t->second);
+    Serial.print(" ");
+  }
+}
+
+void log_mark(time_stamp *t, int mark)
+{
+  log_time(t);
+  Serial.print("mark ");
+  Serial.println(mark);
+}
+
+void log_data(time_stamp *t, unsigned char valid_th, int temp, int humidity, unsigned char valid_p, int pressure)
+{
+  log_time(t);
+  if (valid_th) {
+    Serial.print(temp);
+    Serial.print(" ");
+    Serial.print(humidity);
+    if (valid_p)
+      Serial.print(" ");
+  }
+  if (valid_p) 
+    Serial.print(pressure);
+  Serial.println();
 }
 
 void 
@@ -727,18 +614,18 @@ setup() {
        save_info._T1_degC = smeHumidity._T1_degC; // temp calibration parameters
        save_info._T0_OUT = smeHumidity._T0_OUT;
        save_info._T1_OUT = smeHumidity._T1_OUT;
-       save_info.last_humidity = 255;
-       save_info.last_temp = 127;
     }
-    Serial.println("start pressure");
+    save_info.last_humidity = 255;
+    save_info.last_temp = 127;
+    Serial.println("start pressure"); 
     pressurePresent = smePressure.begin();
     if (!pressurePresent) {
         Serial.println("- NO LPS25 Pressure Sensor found");
     } else {
       save_info.state |= STATE_PRESSURE_PRESENT;
-      save_info.last_pressure = 0;
       smePressure.deactivate();
     }
+    save_info.last_pressure = 0;
     if (!PC8563_RTC.begin()) {
       Serial.println("- NO PC8563 RTC found");
     } else {
@@ -751,15 +638,29 @@ setup() {
     save_info.state |= STATE_TIME_SET|STATE_RTC_PRESENT;
     write_time_signature();
     save_info.delay = DELAY;   // 1 sec
+    save_info.count = COUNT;
   } else {
-     dump_rtc_data();
+    for (int i = 0; i < save_info.boff; i++){
+      unsigned char c;
+      rtc_mem_read(RTC_BUFF_BASE+i, &c, 1);
+      Serial.print(c, HEX);
+     Serial.print(" ");
+    }
+    Serial.println(" ");
+    int samples = dump_rtc_data();
+     Serial.print(samples);
+     Serial.print(" samples in ");
+     Serial.print(save_info.boff);
+     Serial.println("bytes");
+     
      save_info.boff = 0;
      save_info.last_humidity = 255;
      save_info.last_temp = 127;
      save_info.last_pressure = 0;
      write_time_signature();
   }
-  save_info.count = COUNT;
+  if (save_info.count == 0)
+    save_info.count = COUNT;
 #ifdef NOTDEF
 smeHumidity.begin();
 smePressure.begin();
