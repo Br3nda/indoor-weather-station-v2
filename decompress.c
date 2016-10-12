@@ -90,6 +90,7 @@ dump_rtc_data(void)
   tm.second = 0;
   for (i = 0; ;) {
     c = get_compressed_byte(i);
+printf("C=%x\n",c);
     i++;
     if ((c&0xf0) == 0xf0) {
       if (c == 0xff)
@@ -179,19 +180,21 @@ dump_rtc_data(void)
         }
         samples++;
         if (!(c&0x80)) { // delta?
+          int skip=0;
           if (stream_type&1) {
-            int d=c&0xf;
-            if (d&0x8) // sign extend
-              d -= 16;
+            int d=c&0x7;
+            if (d&0x4) // sign extend
+              d -= 8;
             last_temp += d;
             d=(c>>4)&0x7;
             if (d&0x4)  // sign extend 
               d -= 8;
             last_humidity += d;
-            if (stream_type&2)
+            skip= c&0x8;
+            if (stream_type&2 && !skip)
               c = get_compressed_byte(i++);
           }
-          if (stream_type&2) {
+          if (stream_type&2 && !skip) {
             int d=c;
             if (d&0x40) // sign extend
               d -= 128;

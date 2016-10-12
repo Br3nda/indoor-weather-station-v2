@@ -19,7 +19,8 @@
 
       // humidity/temp compression - humidity is 7 bits 0-100, temp is 8 bits signed C
       // If bit 7 of byte 0 is 1 then bits 6:0 of byte0 is % humidity, byte1 is temp in C
-      // if bit 7 of byte 0 is 0 then bits 6:4 are a signed diff of humidity from previous value, 3:0 are a signed diff of temp from previous value
+      // if bit 7 of byte 0 is 0 then bits 6:4 are a signed diff of humidity from previous value, 2:0 are a signed diff of temp from previous value, bit 3 
+      //      says that a following pressure value is unchanged and omitted
       // if bits 7:4 of byte 0 are 1111 it is an escape (see below)
       // 
       // pressure compression

@@ -17,7 +17,8 @@
 
       // humidity/temp compression - humidity is 7 bits 0-100, temp is 8 bits signed C
       // If bit 7 of byte 0 is 1 then bits 6:0 of byte0 is % humidity, byte1 is temp in C
-      // if bit 7 of byte 0 is 0 then bits 6:4 are a signed diff of humidity from previous value, 3:0 are a signed diff of temp from previous value
+      // if bit 7 of byte 0 is 0 then bits 6:4 are a signed diff of humidity from previous value, 2:0 are a signed diff of temp from previous value, bit 3 
+      //      says that a following pressure value is unchanged and omitted
       // if bits 7:4 of byte 0 are 1111 it is an escape (see below)
       // 
       // pressure compression
@@ -47,7 +48,7 @@
 
 #define COUNT 60            // how many samples before trying to push upstream
 #define DELAY 1000000       // 1 SEC in uS
-#define MAGIC 0x4d          // increment this (mod 256) when you make changes to force initialisation
+#define MAGIC 0x54          // increment this (mod 256) when you make changes to force initialisation
 
 extern "C" {
   #include "user_interface.h"
@@ -87,6 +88,7 @@ typedef struct rtc_info {
     unsigned char   compressor_state;   //
 #define CSTATE_SAME       0x01          // we have an active 'same' entry
 #define CSTATE_LAST_SAME  0x02          // the last entry we put was deltas '0'
+#define CSTATE_NOPR       0x04          // the last entry had a skipped - 0 pressure valoue
     unsigned long   delay;    // how long to wait for 
     unsigned short  last_pressure;      // 0xffff means no last value
     signed char     last_temp;          // 0x7f means no last value
@@ -272,7 +274,7 @@ unload_rtc_buffer(int sz)
      save_info.last_humidity = 255;
      save_info.last_temp = 127;
      save_info.last_pressure = 0;
-     save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME);
+     save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
      //save_info.boff = 0;
 }
 
@@ -378,7 +380,7 @@ XinitVariant()
     }
     force=0;
     same=0;
-      // activate internal pullups for twi.
+    // activate internal pullups for twi.
     Wire.begin(4, 5);
     
     if (save_info.state&STATE_HUMID_PRESENT) 
@@ -414,15 +416,15 @@ XinitVariant()
       v = ((save_info._T0_degC + (((int16_t)v-(int16_t)save_info._T0_OUT)*(save_info._T1_degC-save_info._T0_degC))/((int16_t)save_info._T1_OUT-(int16_t)save_info._T0_OUT))+3)>>3;
       temp = v;
 //Serial.print("temp=");Serial.println(temp);
-     dt = temp-save_info.last_temp;
+      dt = temp-save_info.last_temp;
       save_info.last_temp = temp;
       dh = humidity-save_info.last_humidity;
       save_info.last_humidity = humidity;
-      if (dh > 3 || dh < -4 || dt > 7 || dt < -8)
+      if (dh > 3 || dh < -4 || dt > 3 || dt < -4)
           force = 1;
 //Serial.print("dh=");Serial.println(dh);
 //Serial.print("dt=");Serial.println(dt);
-      th_delta = (dt&0xf)|((dh&0x7)<<4);
+      th_delta = (dt&0x7)|((dh&0x7)<<4);
     } else {
       th_delta = 0x00;
     }
@@ -449,7 +451,7 @@ XinitVariant()
 // Serial.print("--");
 //Serial.println(p_delta,HEX);
     if (force) {    // force means send full values rather than del;tas
-      save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME);
+      save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
       if (save_info.state&STATE_HUMID_PRESENT) {
         b[0] = 0x80|save_info.last_humidity;
         b[1] = (unsigned char)save_info.last_temp;
@@ -480,30 +482,38 @@ XinitVariant()
             }
         } else
         if (save_info.compressor_state&CSTATE_LAST_SAME) { // 2nd delta convert previous delta into a 'repeat'
-            save_info.compressor_state &= ~CSTATE_LAST_SAME;
-            save_info.compressor_state |= CSTATE_SAME;
             if (save_info.state&STATE_HUMID_PRESENT) 
               save_info.boff--;
-            if (save_info.state&STATE_PRESSURE_PRESENT) 
+            if (save_info.state&STATE_PRESSURE_PRESENT && !(save_info.compressor_state&CSTATE_NOPR)) 
               save_info.boff--;
+            save_info.compressor_state &= ~(CSTATE_LAST_SAME|CSTATE_NOPR);
+            save_info.compressor_state |= CSTATE_SAME;
             sz = 2;
             b[0] = 0xf8;
             b[1] = 2;
         } else { // first '0' delta just store the '0'
           save_info.compressor_state |= CSTATE_LAST_SAME;          
           sz = 0;
-          if (save_info.state&STATE_HUMID_PRESENT)
-            b[sz++] = th_delta;
+          if (save_info.state&STATE_HUMID_PRESENT) {
+            b[sz++] = th_delta|0x08;
+            save_info.compressor_state |= CSTATE_NOPR;
+          } else
           if (save_info.state&STATE_PRESSURE_PRESENT)
             b[sz++] = p_delta;
         }
       } else {  // non-0 delta just save the deltas
         save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME);
         sz = 0;
-        if (save_info.state&STATE_HUMID_PRESENT)
-          b[sz++] = th_delta;
-        if (save_info.state&STATE_PRESSURE_PRESENT)
-          b[sz++] = p_delta;
+        if (p_delta == 0x00 && (save_info.state&(STATE_HUMID_PRESENT|STATE_PRESSURE_PRESENT)) == (STATE_HUMID_PRESENT|STATE_PRESSURE_PRESENT)) {
+          save_info.compressor_state |= CSTATE_NOPR;
+          b[sz++] = th_delta|0x08; 
+        } else {
+          save_info.compressor_state &= ~CSTATE_NOPR;
+          if (save_info.state&STATE_HUMID_PRESENT)
+            b[sz++] = th_delta;
+          if (save_info.state&STATE_PRESSURE_PRESENT)
+            b[sz++] = p_delta;
+        }
       }
     }
 
