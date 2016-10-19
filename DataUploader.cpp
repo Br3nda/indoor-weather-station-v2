@@ -71,6 +71,7 @@ bool DataUploader::isDone()
                     Serial.println("Got connection in isDone()");
                     return true;
 
+                case WL_NO_SSID_AVAIL:  // Requested SSID not seen
                 case WL_CONNECT_FAILED:
                 case WL_CONNECTION_LOST:
                     tryNextAp();
