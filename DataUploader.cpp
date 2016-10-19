@@ -21,6 +21,9 @@ StaticAPInfo staticAPs[]{ {"Wicked",  "", ""},
                           {"Library", "", ""} };
 #pragma GCC diagnostic pop
 
+// Units determined by length of delay in main loop()
+#define DATAUPLOADER_WIFI_CONNECT_TIMEOUT 1500
+
 DataUploader * DataUploader::instance(nullptr);
 
 DataUploader::DataUploader( APCredentials *preferredAP /* = nullptr */ )
@@ -78,7 +81,10 @@ bool DataUploader::isDone()
                     return false;
 
                 case WL_DISCONNECTED: // In this state while connecting
-                    // TODO: Need a timeout so we don't keep trying a nonexistant AP forever.
+                    if( --connectCountdown == 0 ) {
+                        tryNextAp();
+                        return false;
+                    }
                 default:
                     return false;
             }
@@ -118,6 +124,7 @@ void DataUploader::tryNextAp()
         Serial.println(requestedSSID);
         WiFi.begin(requestedSSID.c_str(), requestedPassphrase.c_str());
 
+        connectCountdown = DATAUPLOADER_WIFI_CONNECT_TIMEOUT;
         ++nextAPIndex;
     } else if( nextAPIndex < sizeof(staticAPs) / sizeof(staticAPs[0]) ) {
         Serial.print("Trying to connect to ");
@@ -125,6 +132,7 @@ void DataUploader::tryNextAp()
         WiFi.begin( staticAPs[nextAPIndex].ssid,
                     staticAPs[nextAPIndex].passphrase );
 
+        connectCountdown = DATAUPLOADER_WIFI_CONNECT_TIMEOUT;
         ++nextAPIndex;
     } else {
         Serial.println("Out of APs; failed");

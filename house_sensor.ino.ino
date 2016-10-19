@@ -782,6 +782,7 @@ loop() {
             enter_deep_sleep();
             return;
          }
+        // Note timeouts in DataUploader depend on this value
         delay(15);
     }
 }

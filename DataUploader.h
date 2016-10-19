@@ -46,6 +46,9 @@ class DataUploader
         /// -1 if have requested AP, otherwise indexes in to staticAPs
         int nextAPIndex;
 
+        /// Used to time out connection attempts
+        int connectCountdown;
+
         /// Set to the user's preferred AP, or empty string if using the list.
         String requestedSSID, requestedPassphrase;
 
