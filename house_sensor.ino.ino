@@ -115,6 +115,9 @@ CaptiveConfig *configGetter(nullptr);
 /// Similarly, DataUploader is used for uploading data over WiFi
 DataUploader *dataUploader(nullptr);
 
+// TODO: Replace this with some real datas
+static char uploadData[] = "Some stuff goes here.\0After the null works!";
+
 /// Used to confirm that device knows user wants to do something
 uint8_t blinkCount(0);
 
@@ -734,8 +737,10 @@ smePressure.deactivate();
           startBlink();
 
           // TODO: Get WiFi credentials from flash, actually upload data
-          APCredentials pretendFromFlash{"a ssid", "a password"};
-          dataUploader = new DataUploader(&pretendFromFlash);
+          APCredentials preferredAP{"a ssid", "a password"};
+
+          // TODO: Real data here
+          dataUploader = new DataUploader(uploadData, sizeof(uploadData), &preferredAP);
 
           return; // This return without enter_deep_sleep() means "go to loop()"
         }
