@@ -128,7 +128,7 @@ bool CaptiveConfig::haveConfig()
 }
 
 
-APCredentials CaptiveConfig::getConfig() const
+APCredentials CaptiveConfig::getCredentials() const
 {
     assert(pickedCreds);
     assert(state == CaptiveConfigState::DONE);
@@ -138,6 +138,13 @@ APCredentials CaptiveConfig::getConfig() const
     }
 
     return APCredentials();
+}
+
+
+String CaptiveConfig::getEmail() const
+{
+    assert(pickedCreds);
+    return registrationEmail;
 }
 
 
@@ -264,6 +271,8 @@ String CaptiveConfig::makeApJson() const
         instance->configHTTPServer->arg("ssid"),
         instance->configHTTPServer->arg("pass")
         };
+
+    instance->registrationEmail = instance->configHTTPServer->arg("email");
 
     instance->state = CaptiveConfigState::DONE;
 

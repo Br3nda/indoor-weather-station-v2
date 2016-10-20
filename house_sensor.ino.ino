@@ -764,6 +764,9 @@ loop() {
 
             // TODO: Put config info in to flash
 
+            Serial.println("Registration Email:");
+            Serial.println(configGetter->getEmail());
+
             delete configGetter;
             configGetter = nullptr;
             enter_deep_sleep();
