@@ -1,3 +1,4 @@
+
 /*   
  *   Copyright (C) 2016 Paul Campbell
 
@@ -48,11 +49,11 @@
 
 #define COUNT 60            // how many samples before trying to push upstream
 #define DELAY 1000000       // 1 SEC in uS
-#define MAGIC 0x67          // increment this (mod 256) when you make changes to force initialisation
+#define MAGIC 0x68          // increment this (mod 256) when you make changes to force initialisation
 
 extern "C" {
   #include "user_interface.h"
-  extern struct rst_info resetInfo;
+  extern struct rst_info resetInfo; 
   void esp_yield();
 }
 
@@ -62,6 +63,74 @@ extern "C" {
 #include "PC8563.h"
 #include "CaptiveConfig.h"
 #include "decompress.h"
+#include <EEPROM.h>
+
+//
+//  512k Flash layout is supposedly:
+//
+//  00000   app
+//  7B000   _SPIFFS_end
+//  7c000   Default Config
+//  7e000   blank.bin
+//
+
+// eeprom 4k at 7B000
+EEPROMClass home_eeprom(((512*1024)-(2*8*1024)-SPI_FLASH_SEC_SIZE)/SPI_FLASH_SEC_SIZE);
+
+typedef struct eeprom_contents {
+    unsigned char   magic;    // always 0xa5 - if it's not that we'll erase it
+    unsigned char   version;
+#define EEPROM_VERSION 0
+    unsigned short  length; // length of this structure (by default we upgrade 
+    // add your stuff here and 
+} eeprom_contents;
+
+//
+// EEPROM Contents are stored in ee - if you want to add fields add them at the end of
+//  the typedef above and bump the version number above, mthey will be initialised to 0 
+//  next time we start
+//  if you change eeprom values write them in ee, and set eeprom_changed ... make sure 
+//  you call store_eeprom before going back to deep sleep
+//
+eeprom_contents ee;
+bool eeprom_loaded=0;
+bool eeprom_changed;
+void load_eeprom()
+{
+    if (eeprom_loaded)
+      return;
+    home_eeprom.begin(sizeof(ee));
+    home_eeprom.get(0, ee);
+    if (ee.magic != 0xa5) {
+      memset(&ee, 0, sizeof(ee));   
+      ee.magic = 0xa5;
+      ee.version =  EEPROM_VERSION;
+      ee.length = sizeof(ee);
+      eeprom_changed = 1;
+    } else {
+      eeprom_changed = 0;
+      if (ee.length != sizeof(ee)) {
+        unsigned char *ep = (unsigned char *)&ee;
+        memset(&ep[ee.length], 0, sizeof(ee)-ee.length);
+        ee.length = sizeof(ee);
+      }
+      if (ee.version != EEPROM_VERSION) {
+        // put any code required to go from one version to another here
+        ee.version = EEPROM_VERSION;
+      }
+    }
+    eeprom_loaded = 1;
+}
+
+void
+save_eeprom()
+{
+  if (!eeprom_loaded || !eeprom_changed)
+    return;
+  home_eeprom.put(0, ee);
+  home_eeprom.commit();
+}
+
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -132,6 +201,7 @@ void enter_deep_sleep()
   // Ensure that the notification LED is off before we go to sleep
   blinkCount = 0;
   digitalWrite(2, 1);
+  save_eeprom();
 
   rtc_mem_write(0, &save_info, sizeof(save_info));
   system_deep_sleep_set_option(0);
@@ -709,6 +779,7 @@ smePressure.deactivate();
   //  do any setup() stuff here
   //
   //---------------------------------------------------
+  load_eeprom();  // ee is valid from here
    // ADC:
   //    1024 - nothing pressed
   //    369   - top button pressed    - upload data
