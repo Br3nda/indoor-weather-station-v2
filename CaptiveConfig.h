@@ -22,7 +22,6 @@ struct APType
     uint8_t encryptionType; // = ENC_TYPE_NONE for open networks
 };
 
-
 /// Used to provide a "Captive Portal" so the user can set WiFi Passwords, etc.
 /*!
  * Should only ever be one of these created at a time; ESP8266WebServer uses
@@ -36,8 +35,11 @@ struct APType
  *       // DNS and HTTP servers start up, user makes config selections.
  *       do_other_stuff();
  * 
- *   // Retrieve the config
- *   auto receivedConfig(configGetter->getConfig());
+ *   // Retrieve the AP credentials
+ *   auto receivedConfig(configGetter->getCredentials());
+ *
+ *   // Retrieve registration email
+ *   auto receivedConfig(configGetter->getEmail());
  *
  *   // done
  *   delete configGetter;
@@ -53,7 +55,10 @@ class CaptiveConfig
         bool haveConfig();
 
         /// Returns the SSID + Passphase selected
-        APCredentials getConfig() const;
+        APCredentials getCredentials() const;
+
+        /// Returns the registration email address
+        String getEmail() const;
         
     protected:
 
@@ -110,6 +115,8 @@ class CaptiveConfig
         static CaptiveConfig *instance;
 
         APCredentials *pickedCreds;
+
+        String registrationEmail;
 }; // end class CaptiveConfig
 
 #endif // #ifndef CAPTIVE_CONFIG_HEADER

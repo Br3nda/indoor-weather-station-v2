@@ -21,9 +21,15 @@ StaticAPInfo staticAPs[]{ {"Wicked",  "", ""},
                           {"Library", "", ""} };
 #pragma GCC diagnostic pop
 
+// Units determined by length of delay in main loop()
+#define DATAUPLOADER_WIFI_CONNECT_TIMEOUT 5000
+
 DataUploader * DataUploader::instance(nullptr);
 
-DataUploader::DataUploader( APCredentials *preferredAP /* = nullptr */ )
+DataUploader::DataUploader( char *uploadData, size_t uploadLen,
+                            APCredentials *preferredAP /* = nullptr */ ) :
+    uploadDataPtr(uploadData),
+    uploadDataLen(uploadLen)
 {
     assert(instance == nullptr);
     instance = this;
@@ -66,18 +72,28 @@ bool DataUploader::isDone()
         case DataUploaderState::WIFI_TBD:
             switch(WiFi.status()) {
                 case WL_CONNECTED:
-                    // TODO Handle actually uploading data
-                    state = DataUploaderState::SUCCESS;
-                    Serial.println("Got connection in isDone()");
-                    return true;
+                    if( doUpload() ) {
+                        state = DataUploaderState::SUCCESS;
+                        Serial.println("Uploaded successfully!");
+                        return true;
+                    } else {
+                        // TODO: Retry?
+                        Serial.println("Upload failed.");
+                        tryNextAp();
+                        return false;
+                    }
 
+                case WL_NO_SSID_AVAIL:  // Requested SSID not seen
                 case WL_CONNECT_FAILED:
                 case WL_CONNECTION_LOST:
                     tryNextAp();
                     return false;
 
                 case WL_DISCONNECTED: // In this state while connecting
-                    // TODO: Need a timeout so we don't keep trying a nonexistant AP forever.
+                    if( --connectCountdown == 0 ) {
+                        tryNextAp();
+                        return false;
+                    }
                 default:
                     return false;
             }
@@ -117,6 +133,7 @@ void DataUploader::tryNextAp()
         Serial.println(requestedSSID);
         WiFi.begin(requestedSSID.c_str(), requestedPassphrase.c_str());
 
+        connectCountdown = DATAUPLOADER_WIFI_CONNECT_TIMEOUT;
         ++nextAPIndex;
     } else if( nextAPIndex < sizeof(staticAPs) / sizeof(staticAPs[0]) ) {
         Serial.print("Trying to connect to ");
@@ -124,11 +141,40 @@ void DataUploader::tryNextAp()
         WiFi.begin( staticAPs[nextAPIndex].ssid,
                     staticAPs[nextAPIndex].passphrase );
 
+        connectCountdown = DATAUPLOADER_WIFI_CONNECT_TIMEOUT;
         ++nextAPIndex;
     } else {
         Serial.println("Out of APs; failed");
         state = DataUploaderState::CANT_CONNECT_TO_ANY;
     }
+}
+
+
+bool DataUploader::doUpload()
+{
+#if DATAUPLOADER_USE_HTTPS
+  #error "This isn't implemented yet..."
+#else
+    WiFiClient client;
+#endif // #if/else DATAUPLOADER_USE_HTTPS
+
+    if( !client.connect( DATAUPLOADER_SERVER_URL,
+                         DATAUPLOADER_SERVER_PORT ) ) {
+        Serial.println("connect() failed.");
+        return false;
+    }
+    Serial.println("connect() success.");
+
+    client.println("POST /upload/ HTTP/1.1");
+    client.println("Content-Type: application/x-www-form-urlencoded");
+    client.print("Content-Length: ");
+    client.println(uploadDataLen, DEC);
+    client.println("");
+    client.write_P(uploadDataPtr, uploadDataLen);
+    //TODO: Loop until we've written enough bytes, etc
+    client.stop();
+
+    return true;
 }
 
 
