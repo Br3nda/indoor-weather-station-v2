@@ -62,75 +62,9 @@ extern "C" {
 #include "LPS25H.h"
 #include "PC8563.h"
 #include "CaptiveConfig.h"
-#include "DataUploader.h"
 #include "decompress.h"
-#include <EEPROM.h>
+#include "house_eeprom.h"
 
-//
-//  512k Flash layout is supposedly:
-//
-//  00000   app
-//  7B000   _SPIFFS_end
-//  7c000   Default Config
-//  7e000   blank.bin
-//
-
-// eeprom 4k at 7B000
-EEPROMClass home_eeprom(((512*1024)-(2*8*1024)-SPI_FLASH_SEC_SIZE)/SPI_FLASH_SEC_SIZE);
-
-typedef struct eeprom_contents {
-    unsigned char   magic;    // always 0xa5 - if it's not that we'll erase it
-    unsigned char   version;
-#define EEPROM_VERSION 0
-    unsigned short  length; // length of this structure (by default we upgrade 
-    // add your stuff here and 
-} eeprom_contents;
-
-//
-// EEPROM Contents are stored in ee - if you want to add fields add them at the end of
-//  the typedef above and bump the version number above, mthey will be initialised to 0 
-//  next time we start
-//  if you change eeprom values write them in ee, and set eeprom_changed ... make sure 
-//  you call store_eeprom before going back to deep sleep
-//
-eeprom_contents ee;
-bool eeprom_loaded=0;
-bool eeprom_changed;
-void load_eeprom()
-{
-    if (eeprom_loaded)
-      return;
-    home_eeprom.begin(sizeof(ee));
-    home_eeprom.get(0, ee);
-    if (ee.magic != 0xa5) {
-      memset(&ee, 0, sizeof(ee));   
-      ee.magic = 0xa5;
-      ee.version =  EEPROM_VERSION;
-      ee.length = sizeof(ee);
-      eeprom_changed = 1;
-    } else {
-      eeprom_changed = 0;
-      if (ee.length != sizeof(ee)) {
-        unsigned char *ep = (unsigned char *)&ee;
-        memset(&ep[ee.length], 0, sizeof(ee)-ee.length);
-        ee.length = sizeof(ee);
-      }
-      if (ee.version != EEPROM_VERSION) {
-        // put any code required to go from one version to another here
-        ee.version = EEPROM_VERSION;
-      }
-    }
-    eeprom_loaded = 1;
-}
-
-void
-save_eeprom()
-{
-  if (!eeprom_loaded || !eeprom_changed)
-    return;
-  home_eeprom.put(0, ee);
-  home_eeprom.commit();
-}
 
 
 #ifndef cbi
@@ -181,11 +115,6 @@ rtc_info save_info;
 
 /// A CaptiveConfig is allocated in setup() if we want a config access point.
 CaptiveConfig *configGetter(nullptr);
-/// Similarly, DataUploader is used for uploading data over WiFi
-DataUploader *dataUploader(nullptr);
-
-// TODO: Replace this with some real datas
-static char uploadData[] = "Some stuff goes here.\0After the null works!";
 
 /// Used to confirm that device knows user wants to do something
 uint8_t blinkCount(0);
@@ -207,7 +136,7 @@ void enter_deep_sleep()
   // Ensure that the notification LED is off before we go to sleep
   blinkCount = 0;
   digitalWrite(2, 1);
-  save_eeprom();
+  eeprom.flush();
 
   rtc_mem_write(0, &save_info, sizeof(save_info));
   system_deep_sleep_set_option(0);
@@ -785,7 +714,7 @@ smePressure.deactivate();
   //  do any setup() stuff here
   //
   //---------------------------------------------------
-  load_eeprom();  // ee is valid from here
+  (void)eeprom.get_pointer();  // force a load for testing
    // ADC:
   //    1024 - nothing pressed
   //    369   - top button pressed    - upload data
@@ -803,17 +732,9 @@ smePressure.deactivate();
 
           return; // This return without enter_deep_sleep() means "go to loop()"
         } else {
-          // "Top" button pressed
           Serial.println("Want to upload data.");
-          startBlink();
 
-          // TODO: Get WiFi credentials from flash, actually upload data
-          APCredentials preferredAP{"a ssid", "a password"};
-
-          // TODO: Real data here
-          dataUploader = new DataUploader(uploadData, sizeof(uploadData), &preferredAP);
-
-          return; // This return without enter_deep_sleep() means "go to loop()"
+          // TODO: Get WiFi credentials from flash, connect, upload data, etc.
         }
       }
   }
@@ -827,42 +748,17 @@ loop() {
         digitalWrite(2, !(--blinkCount & 0x10) );
     }
 
-    // Note that we shouldn't have both a configGetter and
-    // a dataUploader active at the same time.
     if( configGetter ) {
         if( configGetter->haveConfig() ) {
             Serial.println("Got config");
 
-            // TODO: Put config info in to flash
-
-            Serial.println("Registration Email:");
-            Serial.println(configGetter->getEmail());
+            // TODO: Do something useful with the configuration
 
             delete configGetter;
             configGetter = nullptr;
             enter_deep_sleep();
-            return;
+        } else {
+            delay(15);
         }
-        delay(15);
-    } else if( dataUploader ) {
-        if( dataUploader->isDone() ) {
-            Serial.print("Uploader done...");
-
-            if( dataUploader->succeeded() ) {
-            // TODO: Do something useful
-                Serial.println("Success!");
-            } else {
-            // TODO: Do something useful
-                Serial.println("Failed!");
-            }
-
-            delete dataUploader;
-            dataUploader = nullptr;
-            enter_deep_sleep();
-            return;
-         }
-        // Note timeouts in DataUploader depend on this value
-        delay(15);
     }
 }
-
