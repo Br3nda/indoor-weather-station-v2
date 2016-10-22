@@ -16,6 +16,7 @@ CaptiveConfig::CaptiveConfig() :
     configHTTPServer(nullptr),
     configDNSServer(nullptr),
     numAPsFound(0),
+    knownAPs(nullptr),
     pickedCreds(nullptr)
 {
     assert(instance == nullptr);
@@ -194,9 +195,10 @@ void CaptiveConfig::tearDownKnownAPs()
         }
     }
 
-    delete [] knownAPs;
-
-    knownAPs = nullptr;
+    if( numToTearDown ) {
+        delete [] knownAPs;
+        knownAPs = nullptr;
+    }
 }
 
 
