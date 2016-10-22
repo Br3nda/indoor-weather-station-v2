@@ -91,7 +91,7 @@ class CaptiveConfig
          * Resolve duplicates by keeping the strongest signals for a given
          * SSID.  numAPs is the number of APs reported by scanNetworks.
          */
-        void populateKnownAPs(uint8_t numAPs);
+        void populateKnownAPs(int8_t numAPs);
 
         /// Tears down the structure of known APs
         void tearDownKnownAPs();

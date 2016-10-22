@@ -60,18 +60,23 @@ bool CaptiveConfig::haveConfig()
 
         case CaptiveConfigState::SCANNING:
         {
+            // scanComplete() returns negative to indicate status, otherwise
+            // number of access points found.
             auto scanState(WiFi.scanComplete());
 
             if (scanState == WIFI_SCAN_RUNNING) {
-                return false;
+                // Keep waiting
             } else if (scanState == WIFI_SCAN_FAILED) {
                 state = CaptiveConfigState::START_SCANNING;
-                return false;
+            } else if (scanState > -1) {
+                populateKnownAPs(scanState); // <1ms with a couple APs visible
+
+                state = CaptiveConfigState::STARTING_WIFI;
+            } else {
+                // scanState returned a negative value we don't know about
+                state = CaptiveConfigState::START_SCANNING;
             }
 
-            populateKnownAPs(scanState);    // <1ms with a couple APs visible
-
-            state = CaptiveConfigState::STARTING_WIFI;
             return false;
         }
 
@@ -149,7 +154,7 @@ String CaptiveConfig::getEmail() const
 }
 
 
-void CaptiveConfig::populateKnownAPs(uint8_t numAPs)
+void CaptiveConfig::populateKnownAPs(int8_t numAPs)
 {
     tearDownKnownAPs();
 
