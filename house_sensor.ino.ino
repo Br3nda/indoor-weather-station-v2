@@ -739,11 +739,10 @@ smePressure.deactivate();
           return; // This return without enter_deep_sleep() means "go to loop()"
         } else {
           // "Top" button pressed
-          Serial.println("Want to upload data.");
           startBlink();
 
-          // TODO: Get WiFi credentials from flash, actually upload data
-          APCredentials preferredAP{"a ssid", "a password"};
+          auto ep(eeprom.get_pointer());
+          APCredentials preferredAP{ep->wifiSsid, ep->wifiPass};
 
           // TODO: Real data here
           dataUploader = new DataUploader(uploadData, sizeof(uploadData), &preferredAP);
@@ -768,7 +767,16 @@ loop() {
         if( configGetter->haveConfig() ) {
             Serial.println("Got config");
 
-            // TODO: Put config info in to flash
+            auto ep(eeprom.get_pointer());
+            auto config(configGetter->getCredentials());
+
+            strncpy(ep->wifiSsid, config.ssid.c_str(), sizeof(ep->wifiSsid));
+            ep->wifiSsid[ sizeof(ep->wifiSsid) - 1 ] = '\0';
+
+            strncpy(ep->wifiPass, config.ssid.c_str(), sizeof(ep->wifiPass));
+            ep->wifiPass[ sizeof(ep->wifiPass) - 1 ] = '\0';
+
+            eeprom.changed();
 
             Serial.println("Registration Email:");
             Serial.println(configGetter->getEmail());

@@ -42,7 +42,8 @@ typedef struct eeprom_contents {
     unsigned char   version;
 #define EEPROM_VERSION 0
     unsigned short  length; // length of this structure (by default we upgrade 
-    // add your stuff here and 
+    char wifiSsid[33];
+    char wifiPass[65];
 } eeprom_contents;
 
 class house_eeprom {
