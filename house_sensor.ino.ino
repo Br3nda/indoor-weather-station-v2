@@ -64,6 +64,7 @@ extern "C" {
 #include "CaptiveConfig.h"
 #include "decompress.h"
 #include "house_eeprom.h"
+#include "Flash.h"
 
 
 
@@ -273,6 +274,7 @@ writeRegister(unsigned char addr, unsigned char reg, unsigned char val)
     Wire.endTransmission();
 }
 
+
 void 
 unload_rtc_buffer(int sz)
 {
@@ -280,7 +282,7 @@ unload_rtc_buffer(int sz)
      save_info.last_temp = 127;
      save_info.last_pressure = 0;
      save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
-     //save_info.boff = 0;
+     save_info.boff = 0;
 }
 
 void
@@ -714,7 +716,7 @@ smePressure.deactivate();
   //  do any setup() stuff here
   //
   //---------------------------------------------------
-  (void)eeprom.get_pointer();  // force a load for testing
+  //(void)eeprom.get_pointer();  // force a load for testing
    // ADC:
   //    1024 - nothing pressed
   //    369   - top button pressed    - upload data
