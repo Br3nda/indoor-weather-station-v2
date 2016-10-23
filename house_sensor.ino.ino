@@ -62,6 +62,7 @@ extern "C" {
 #include "LPS25H.h"
 #include "PC8563.h"
 #include "CaptiveConfig.h"
+#include "DataUploader.h"
 #include "decompress.h"
 #include "house_eeprom.h"
 #include "Flash.h"
@@ -116,6 +117,11 @@ rtc_info save_info;
 
 /// A CaptiveConfig is allocated in setup() if we want a config access point.
 CaptiveConfig *configGetter(nullptr);
+/// Similarly, DataUploader is used for uploading data over WiFi
+DataUploader *dataUploader(nullptr);
+
+// TODO: Replace this with some real datas
+static char uploadData[] = "Some stuff goes here.\0After the null works!";
 
 /// Used to confirm that device knows user wants to do something
 uint8_t blinkCount(0);
@@ -734,9 +740,16 @@ smePressure.deactivate();
 
           return; // This return without enter_deep_sleep() means "go to loop()"
         } else {
-          Serial.println("Want to upload data.");
+          // "Top" button pressed
+          startBlink();
 
-          // TODO: Get WiFi credentials from flash, connect, upload data, etc.
+          auto ep(eeprom.get_pointer());
+          APCredentials preferredAP{ep->wifiSsid, ep->wifiPass};
+
+          // TODO: Real data here
+          dataUploader = new DataUploader(uploadData, sizeof(uploadData), &preferredAP);
+
+          return; // This return without enter_deep_sleep() means "go to loop()"
         }
       }
   }
@@ -750,17 +763,51 @@ loop() {
         digitalWrite(2, !(--blinkCount & 0x10) );
     }
 
+    // Note that we shouldn't have both a configGetter and
+    // a dataUploader active at the same time.
     if( configGetter ) {
         if( configGetter->haveConfig() ) {
             Serial.println("Got config");
 
-            // TODO: Do something useful with the configuration
+            auto ep(eeprom.get_pointer());
+            auto config(configGetter->getCredentials());
+
+            strncpy(ep->wifiSsid, config.ssid.c_str(), sizeof(ep->wifiSsid));
+            ep->wifiSsid[ sizeof(ep->wifiSsid) - 1 ] = '\0';
+
+            strncpy(ep->wifiPass, config.ssid.c_str(), sizeof(ep->wifiPass));
+            ep->wifiPass[ sizeof(ep->wifiPass) - 1 ] = '\0';
+
+            eeprom.changed();
+
+            Serial.println("Registration Email:");
+            Serial.println(configGetter->getEmail());
 
             delete configGetter;
             configGetter = nullptr;
             enter_deep_sleep();
-        } else {
-            delay(15);
+            return;
         }
+        delay(15);
+    } else if( dataUploader ) {
+        if( dataUploader->isDone() ) {
+            Serial.print("Uploader done...");
+
+            if( dataUploader->succeeded() ) {
+            // TODO: Do something useful
+                Serial.println("Success!");
+            } else {
+            // TODO: Do something useful
+                Serial.println("Failed!");
+            }
+
+            delete dataUploader;
+            dataUploader = nullptr;
+            enter_deep_sleep();
+            return;
+         }
+        // Note timeouts in DataUploader depend on this value
+        delay(15);
     }
 }
+

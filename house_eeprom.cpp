@@ -76,6 +76,13 @@ eeprom_contents* house_eeprom::get_pointer()
 }
 
 void
+house_eeprom::changed()
+{
+  if(is_loaded)
+      is_changed = true;
+}
+
+void
 house_eeprom::flush()
 {
   if (!is_loaded || !is_changed) 
