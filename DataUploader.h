@@ -47,7 +47,9 @@ class DataUploader
         enum class DataUploaderState {
             TRYING_ACCESS_POINT,
             WIFI_TBD, // TODO: Hack - remove
-            SUCCESS,
+            REGISTERING,
+            UPLOADING,
+            SUCCEEDED,
             CANT_CONNECT_TO_ANY,
         } state;
 

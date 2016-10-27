@@ -72,20 +72,13 @@ bool DataUploader::isDone()
         case DataUploaderState::WIFI_TBD:
             switch(WiFi.status()) {
                 case WL_CONNECTED:
-                    if( doUpload() ) {
-                        state = DataUploaderState::SUCCESS;
-                        Serial.println("Uploaded successfully!");
-                        return true;
-                    } else {
-                        // TODO: Retry?
-                        Serial.println("Upload failed.");
-                        tryNextAp();
-                        return false;
-                    }
+                    state = DataUploaderState::REGISTERING;
+                    return false;
 
                 case WL_NO_SSID_AVAIL:  // Requested SSID not seen
                 case WL_CONNECT_FAILED:
                 case WL_CONNECTION_LOST:
+                    state = DataUploaderState::TRYING_ACCESS_POINT;
                     tryNextAp();
                     return false;
 
@@ -97,9 +90,25 @@ bool DataUploader::isDone()
                 default:
                     return false;
             }
+
+        case DataUploaderState::REGISTERING:
+            state = DataUploaderState::UPLOADING;
             return false;
 
-        case DataUploaderState::SUCCESS:
+        case DataUploaderState::UPLOADING:
+            if( doUpload() ) {
+                state = DataUploaderState::SUCCEEDED;
+                Serial.println("Uploaded successfully!");
+                return true;
+            } else {
+                // TODO: Retry with this AP?
+                state = DataUploaderState::TRYING_ACCESS_POINT;
+                Serial.println("Upload failed.");
+                tryNextAp();
+                return false;
+            }
+
+        case DataUploaderState::SUCCEEDED:
         case DataUploaderState::CANT_CONNECT_TO_ANY:
             return true;
 
@@ -112,16 +121,7 @@ bool DataUploader::isDone()
 
 bool DataUploader::succeeded() const
 {
-    switch(state) {
-        case DataUploaderState::SUCCESS:
-            return true;
-
-        case DataUploaderState::CANT_CONNECT_TO_ANY:
-            return false;
-
-        default:
-            return false;
-    }
+    return state == DataUploaderState::SUCCEEDED;
 }
 
 
@@ -182,7 +182,7 @@ bool DataUploader::doUpload()
         const WiFiEventStationModeConnected &eventInfo )
 {
     instance->state = DataUploaderState::WIFI_TBD;
-    Serial.println("WiFi connected");
+    Serial.println("TEST - WiFi connected");
 }
 
 
@@ -190,7 +190,7 @@ bool DataUploader::doUpload()
         const WiFiEventStationModeDisconnected &eventInfo )
 {
     instance->state = DataUploaderState::WIFI_TBD;
-    Serial.println("WiFi disconnected");
+    Serial.println("TEST - WiFi disconnected");
 }
 
 
@@ -198,7 +198,7 @@ bool DataUploader::doUpload()
         const WiFiEventStationModeAuthModeChanged &eventInfo )
 {
     instance->state = DataUploaderState::WIFI_TBD;
-    Serial.println("WiFi auth mode changed");
+    Serial.println("TEST - WiFi auth mode changed");
 }
 
 
@@ -206,13 +206,13 @@ bool DataUploader::doUpload()
         const WiFiEventStationModeGotIP &eventInfo)
 {
     instance->state = DataUploaderState::WIFI_TBD;
-    Serial.println("WiFi got IP");
+    Serial.println("TEST - WiFi got IP");
 }
 
 
 /*static*/ void DataUploader::wifiDhcpTimeoutCb(void)
 {
     instance->state = DataUploaderState::WIFI_TBD;
-    Serial.println("WiFi DHCP timeout");
+    Serial.println("TEST - WiFi DHCP timeout");
 }
 
