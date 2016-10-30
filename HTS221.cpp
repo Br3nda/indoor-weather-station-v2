@@ -49,7 +49,6 @@ HTS221::storeCalibration(void)
         if ((reg!=CALIB_START+8) && (reg!=CALIB_START+9) && (reg!=CALIB_START+4)) {
 
             data = readRegister(HTS221_ADDRESS, reg);
-
             switch (reg) {
             case CALIB_START:
                 _h0_rH = data;
@@ -219,7 +218,7 @@ HTS221::readTemperature(void)
         t_temp = (((int16_t)t_out - (int16_t)_T0_OUT) * deg) / ((int16_t)_T1_OUT - (int16_t)_T0_OUT);
         deg    = ((int16_t)_T0_degC) / 8.0;     // remove x8 multiple
         _temperature = deg + t_temp;   // provide signed celsius measurement unit
-    }
+   }
 
     return _temperature;
 }
