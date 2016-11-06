@@ -2,7 +2,7 @@
 /*   
  *   Copyright (C) 2016 Paul Campbell
 
- *   This program is free software: you can redistribute it and/or modify
+ *   This pro/home/paul/pibot/esp8266/esptool/esptool.pygram is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
  *   the Free Software Foundation, either version 3 of the License, or
  *   (at your option) any later version.
@@ -49,7 +49,8 @@
 
 #define COUNT 60            // how many samples before trying to push upstream
 #define DELAY 1000000       // 1 SEC in uS
-#define MAGIC 0x68          // increment this (mod 256) when you make changes to force initialisation
+#define MAGIC 0x76          // increment this (mod 256) when you make changes to force initialisation
+#define FLASH_ERASE 0
 
 extern "C" {
   #include "user_interface.h"
@@ -65,6 +66,7 @@ extern "C" {
 #include "DataUploader.h"
 #include "decompress.h"
 #include "house_eeprom.h"
+#include "Flash.h"
 
 
 
@@ -102,14 +104,17 @@ typedef struct rtc_info {
     signed short    _H0_T0, _H1_T0;
     unsigned short  _T0_degC, _T1_degC; // temp calibration parameters
     signed short    _T0_OUT, _T1_OUT;
+    unsigned short  flash_start_offset; // offset of firest entry in flash
 
     unsigned char   boff; // offset into buffer for next sample
 } rtc_info;
 
 rtc_info save_info;
+bool commit_rtc_data_pending=0;
+void write_time_signature();
   
 #define RTC_BUFF_BASE (sizeof(rtc_info))
-#define RTC_BUFF_SIZE 256
+#define RTC_BUFF_SIZE 255
 
 #define HTS221_ADDRESS     0x5F
 #define LPS25H_ADDRESS     0x5C
@@ -144,6 +149,7 @@ void enter_deep_sleep()
   digitalWrite(2, 1);
   eeprom.flush();
 
+  save_info.flash_start_offset = flash.GetRememberedOffset();
   rtc_mem_write(0, &save_info, sizeof(save_info));
   system_deep_sleep_set_option(0);
   system_deep_sleep(save_info.delay);
@@ -279,14 +285,77 @@ writeRegister(unsigned char addr, unsigned char reg, unsigned char val)
     Wire.endTransmission();
 }
 
+
 void 
 unload_rtc_buffer(int sz)
 {
-     save_info.last_humidity = 255;
-     save_info.last_temp = 127;
-     save_info.last_pressure = 0;
-     save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
-     //save_info.boff = 0;
+    unsigned char b[255];
+    
+    int samples = dump_rtc_data();
+    Serial.print(samples);
+    Serial.print(" samples in ");
+    Serial.print(save_info.boff);
+    Serial.println("bytes");
+
+    rtc_mem_read(RTC_BUFF_BASE, &b[0], sz);
+    if (flash.WriteRecord(&b[0], sz)) {
+      save_info.last_humidity = 255;
+      save_info.last_temp = 127;
+      save_info.last_pressure = 0;
+      save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
+      save_info.boff = 0;
+      write_time_signature();
+    }
+    printf("Dump flash\n");
+    flash.Dump();
+}
+
+//
+//  Call this routine to get at most max_len bytes of data into a buffer to send upstream
+//  It returns 0 when no data is available otherwise the number of bytes extracted
+//
+//  If we return other than 0 then before we return to deep sleep, or before we call 
+//  get_stored_flash_data() again, we must call one of:
+//
+//  commit_stored_flash_data() - makes the space sent upstream available for more storage
+//  uncommit_stored_flash_data() - upstream write failed, leave the data in the flash for later
+//  
+
+int 
+get_stored_flash_data(unsigned char *p, int max_len)
+{
+  unsigned long l = flash.LoadBuffer(p, max_len);
+
+  commit_rtc_data_pending = 0;
+  if (l&FLASH_END_MARKER) {
+      l &= ~FLASH_END_MARKER;
+      if (save_info.boff < (max_len-l)) {
+        rtc_mem_read(RTC_BUFF_BASE, &p[l], save_info.boff);
+        l += save_info.boff;
+        commit_rtc_data_pending = 1;
+      }
+  }
+  return l;
+}
+
+void
+commit_stored_flash_data(void)
+{
+    flash.CommitBuffer();
+    if (commit_rtc_data_pending) {
+      save_info.last_humidity = 255;
+      save_info.last_temp = 127;
+      save_info.last_pressure = 0;
+      save_info.compressor_state &= ~(CSTATE_SAME|CSTATE_LAST_SAME|CSTATE_NOPR);
+      save_info.boff = 0;
+    }
+}
+
+void
+uncommit_stored_flash_data(void)
+{
+  flash.UnCommitBuffer();
+  commit_rtc_data_pending = 0;
 }
 
 void
@@ -297,7 +366,8 @@ write_time_signature()
     save_info.compressor_state = 0;
     if (save_info.boff > (RTC_BUFF_SIZE-6-(save_info.delay==60000000?0:3))) {  // room for another?
       unload_rtc_buffer(save_info.boff);
-    }
+      return; // unloads as a side effect
+    } 
     b[0] = 0xf0 | (save_info.state&STATE_HUMID_PRESENT?1:0) | (save_info.state&STATE_PRESSURE_PRESENT?2:0);
     if ((save_info.state&(STATE_RTC_PRESENT|STATE_TIME_SET)) == (STATE_RTC_PRESENT|STATE_TIME_SET)) {
       pc_time tm;
@@ -379,6 +449,7 @@ XinitVariant()
 //  Serial.println(save_info.state,HEX);
   if (save_info.magic != MAGIC)
     return 0;
+  flash.SetRememberedOffset(save_info.flash_start_offset);
   if (save_info.state&STATE_SENSORS_ACTIVE) {
     if (adc > 500 && adc < 900) { // insert mark
       b[0] = 0xf6; // mark
@@ -424,8 +495,12 @@ XinitVariant()
       v = readRegister(HTS221_ADDRESS, 0x2b)<<8;
       v |= readRegister(HTS221_ADDRESS, 0x2a);
       writeRegister(HTS221_ADDRESS, 0x20, 0);
+//printf("in %d %d\n", save_info._T0_degC, save_info._T1_degC);
+//printf("out %d %d\n", save_info._T0_OUT,save_info._T1_OUT);
+//printf("cvt %d ", v);
       v = ((save_info._T0_degC + (((int16_t)v-(int16_t)save_info._T0_OUT)*(save_info._T1_degC-save_info._T0_degC))/((int16_t)save_info._T1_OUT-(int16_t)save_info._T0_OUT))+3)>>3;
       temp = v;
+//printf("%d\n", v);
 //Serial.print("temp=");Serial.println(temp);
       dt = temp-save_info.last_temp;
       save_info.last_temp = temp;
@@ -534,7 +609,9 @@ XinitVariant()
       unload_rtc_buffer(save_info.boff);
     }
   }
+//printf("off=%d\n", save_info.boff);
   save_info.count--;
+  save_info.flash_start_offset = flash.GetRememberedOffset(); // save offset
   rtc_mem_write(0, &save_info, sizeof(save_info));
   if (!save_info.count)
       return 0;
@@ -634,6 +711,9 @@ setup() {
   if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE || save_info.magic != MAGIC) {  // system powerup reset
     bool humidityPresent, pressurePresent;
 
+#if FLASH_ERASE
+    flash.Erase();
+#endif
     memset(&save_info, 0, sizeof(save_info));
     save_info.magic = MAGIC;
     Serial.println("VCW sensor");
@@ -679,6 +759,7 @@ setup() {
     save_info.delay = DELAY;   // 1 sec
     save_info.count = COUNT;
   } else {
+    flash.SetRememberedOffset(save_info.flash_start_offset);
 #ifdef NOTDEF
     for (int i = 0; i < save_info.boff; i++){
       unsigned char c;
@@ -688,17 +769,19 @@ setup() {
     }
     Serial.println(" ");
 #endif
+#ifdef NOTDEF
     int samples = dump_rtc_data();
      Serial.print(samples);
      Serial.print(" samples in ");
      Serial.print(save_info.boff);
-     Serial.println("bytes");
+     Serial.println(" bytes");
      
      save_info.boff = 0;
      save_info.last_humidity = 255;
      save_info.last_temp = 127;
      save_info.last_pressure = 0;
      write_time_signature();
+#endif
   }
   if (save_info.count == 0)
     save_info.count = COUNT;
@@ -720,7 +803,7 @@ smePressure.deactivate();
   //  do any setup() stuff here
   //
   //---------------------------------------------------
-  (void)eeprom.get_pointer();  // force a load for testing
+  //(void)eeprom.get_pointer();  // force a load for testing
    // ADC:
   //    1024 - nothing pressed
   //    369   - top button pressed    - upload data
