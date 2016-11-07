@@ -856,7 +856,7 @@ loop() {
             strncpy(ep->wifiSsid, config.ssid.c_str(), sizeof(ep->wifiSsid));
             ep->wifiSsid[ sizeof(ep->wifiSsid) - 1 ] = '\0';
 
-            strncpy(ep->wifiPass, config.ssid.c_str(), sizeof(ep->wifiPass));
+            strncpy(ep->wifiPass, config.passphrase.c_str(), sizeof(ep->wifiPass));
             ep->wifiPass[ sizeof(ep->wifiPass) - 1 ] = '\0';
 
             eeprom.changed();
