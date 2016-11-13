@@ -6,8 +6,9 @@
 #include <ESP8266WiFi.h>
 
 #define DATAUPLOADER_USE_HTTPS false
-#define DATAUPLOADER_SERVER_URL "someurl.org.nz"
+#define DATAUPLOADER_SERVER_HOST "requestb.in"
 #define DATAUPLOADER_SERVER_PORT 80
+#define DATAUPLOADER_SERVER_URI "/1iu11tj1"
 
 /// Connects to the WiFi AP, uploads data to server, etc.
 /*!
@@ -19,7 +20,7 @@ class DataUploader
 {
     public:
         /// preferredAP is the set of credentials input by the user
-        DataUploader( char *uploadData, size_t uploadLen,
+        DataUploader( uint8_t *uploadData, size_t uploadLen,
                       APCredentials *preferredAP = nullptr );
 
         /// Puts the WiFi in to sleep mode
@@ -37,6 +38,9 @@ class DataUploader
 
         /// Called after we've connected to WiFi, returns true if successful.
         bool doUpload();
+
+        /// Returns true when there's a login URL to be loaded
+        bool haveLoginUrl() const;
 
         static void wifiConnectCb(const WiFiEventStationModeConnected &);
         static void wifiDisconnectCb(const WiFiEventStationModeDisconnected &);
@@ -66,7 +70,7 @@ class DataUploader
         static DataUploader *instance;
 
         /// Data we're uploading - owned by caller
-        char *uploadDataPtr;
+        uint8_t *uploadDataPtr;
 
         /// Length in bytes of data to upload
         size_t uploadDataLen;

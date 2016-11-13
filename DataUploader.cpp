@@ -1,5 +1,7 @@
 #include "DataUploader.h"
 
+#include <ESP8266HTTPClient.h>
+
 #include <cassert>
 
 /// Used for the static list of public APs that we know about at build time
@@ -26,7 +28,7 @@ StaticAPInfo staticAPs[]{ {"Wicked",  "", ""},
 
 DataUploader * DataUploader::instance(nullptr);
 
-DataUploader::DataUploader( char *uploadData, size_t uploadLen,
+DataUploader::DataUploader( uint8_t *uploadData, size_t uploadLen,
                             APCredentials *preferredAP /* = nullptr */ ) :
     uploadDataPtr(uploadData),
     uploadDataLen(uploadLen)
@@ -76,14 +78,16 @@ bool DataUploader::isDone()
                     return false;
 
                 case WL_NO_SSID_AVAIL:  // Requested SSID not seen
-                case WL_CONNECT_FAILED:
+                case WL_CONNECT_FAILED: // Eg passphrase wrong
                 case WL_CONNECTION_LOST:
+                    Serial.println("Error connecting.");
                     state = DataUploaderState::TRYING_ACCESS_POINT;
                     tryNextAp();
                     return false;
 
                 case WL_DISCONNECTED: // In this state while connecting
                     if( --connectCountdown == 0 ) {
+                        Serial.println("Timed out while trying to connect...");
                         tryNextAp();
                         return false;
                     }
@@ -92,6 +96,12 @@ bool DataUploader::isDone()
             }
 
         case DataUploaderState::REGISTERING:
+            if( haveLoginUrl() ) {
+                HTTPClient c;
+                c.begin(staticAPs[nextAPIndex].loginUrl);
+                c.GET();
+                c.end();
+            }
             state = DataUploaderState::UPLOADING;
             return false;
 
@@ -150,31 +160,37 @@ void DataUploader::tryNextAp()
 }
 
 
+bool DataUploader::haveLoginUrl() const
+{
+    if( nextAPIndex == -1 || nextAPIndex == sizeof(staticAPs) )
+        return false;
+
+    return strlen(staticAPs[nextAPIndex].loginUrl) > 0;
+}
+
+
 bool DataUploader::doUpload()
 {
+    HTTPClient client;
 #if DATAUPLOADER_USE_HTTPS
   #error "This isn't implemented yet..."
 #else
-    WiFiClient client;
+    if( !client.begin( DATAUPLOADER_SERVER_HOST,
+                       DATAUPLOADER_SERVER_PORT,
+                       DATAUPLOADER_SERVER_URI ) ) {
 #endif // #if/else DATAUPLOADER_USE_HTTPS
 
-    if( !client.connect( DATAUPLOADER_SERVER_URL,
-                         DATAUPLOADER_SERVER_PORT ) ) {
-        Serial.println("connect() failed.");
         return false;
     }
-    Serial.println("connect() success.");
 
-    client.println("POST /upload/ HTTP/1.1");
-    client.println("Content-Type: application/x-www-form-urlencoded");
-    client.print("Content-Length: ");
-    client.println(uploadDataLen, DEC);
-    client.println("");
-    client.write_P(uploadDataPtr, uploadDataLen);
-    //TODO: Loop until we've written enough bytes, etc
-    client.stop();
+    client.addHeader("Content-Type", "application/weatherdata");
+    auto res( client.POST(uploadDataPtr, uploadDataLen) );
 
-    return true;
+    client.end();
+
+    return res == HTTP_CODE_OK ||
+           res == HTTP_CODE_CREATED ||
+           res == HTTP_CODE_ACCEPTED;
 }
 
 

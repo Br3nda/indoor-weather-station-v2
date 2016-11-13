@@ -121,11 +121,13 @@ void write_time_signature();
 
 /// A CaptiveConfig is allocated in setup() if we want a config access point.
 CaptiveConfig *configGetter(nullptr);
+
 /// Similarly, DataUploader is used for uploading data over WiFi
 DataUploader *dataUploader(nullptr);
 
-// TODO: Replace this with some real datas
-static char uploadData[] = "Some stuff goes here.\0After the null works!";
+#define UPLOAD_BUFFER_SIZE 256
+/// For passing data between flash and the DataUploader instance
+uint8_t *uploadBuf(nullptr);
 
 /// Used to confirm that device knows user wants to do something
 uint8_t blinkCount(0);
@@ -827,8 +829,10 @@ smePressure.deactivate();
           auto ep(eeprom.get_pointer());
           APCredentials preferredAP{ep->wifiSsid, ep->wifiPass};
 
-          // TODO: Real data here
-          dataUploader = new DataUploader(uploadData, sizeof(uploadData), &preferredAP);
+          uploadBuf = new uint8_t[UPLOAD_BUFFER_SIZE];
+          memcpy(uploadBuf, "Unique ID goes here.", 20); // TODO
+          auto uploadSz( get_stored_flash_data(uploadBuf + 20, UPLOAD_BUFFER_SIZE - 20) );
+          dataUploader = new DataUploader(uploadBuf, uploadSz + 20, &preferredAP);
 
           return; // This return without enter_deep_sleep() means "go to loop()"
         }
@@ -875,15 +879,18 @@ loop() {
             Serial.print("Uploader done...");
 
             if( dataUploader->succeeded() ) {
-            // TODO: Do something useful
+                commit_stored_flash_data();
                 Serial.println("Success!");
             } else {
-            // TODO: Do something useful
+                uncommit_stored_flash_data();
                 Serial.println("Failed!");
             }
 
             delete dataUploader;
             dataUploader = nullptr;
+
+            delete uploadBuf;
+
             enter_deep_sleep();
             return;
          }
