@@ -213,8 +213,8 @@ HomeFlash::LoadBuffer(unsigned char *p, int max_len)
   int r = 0;
   if (!init)
     DoInit();
-  for (;;) {
-    for (;;) {
+  for (;;) { // Loop over pages
+    while(r < max_len) { // Loop over records in page
       unsigned char sz;
       if (next_page_offset >= SEC_MAX_DATA)
         break;
@@ -223,6 +223,11 @@ HomeFlash::LoadBuffer(unsigned char *p, int max_len)
       if (sz == 0xff)
         break;
       sz += 1;
+
+      // Don't return partial records
+      if (r + sz > max_len)
+          break;
+
       int inc = (sz+1+3)&~3;
       if (inc > 4)
         spi_flash_read(next_page_address+sizeof(flash_page_header)+next_page_offset+4, (unsigned int *)&b.b[4], inc-4);

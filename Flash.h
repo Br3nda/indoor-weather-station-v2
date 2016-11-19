@@ -53,7 +53,9 @@ private:
   unsigned char read_length(unsigned int offset);
   unsigned int first_page_address;
   unsigned int first_page_offset;
+  /// Address of the page that will be read by next call to LoadBuffer()
   unsigned int next_page_address;
+  /// Offset to the current record in page at next_page_address
   unsigned int next_page_offset;
   unsigned int current_page_address;
   unsigned int current_page_offset;
