@@ -216,8 +216,11 @@ HomeFlash::LoadBuffer(unsigned char *p, int max_len)
   for (;;) { // Loop over pages
     while(r < max_len) { // Loop over records in page
       unsigned char sz;
-      if (next_page_offset >= SEC_MAX_DATA)
+      if (next_page_offset >= SEC_MAX_DATA) {
+        next_page_offset = 0;
         break;
+      }
+      // Read in first four bytes, which include the size field
       spi_flash_read(next_page_address+sizeof(flash_page_header)+next_page_offset, (unsigned int *)&b, 4);
       sz = b.b[0];
       if (sz == 0xff)
@@ -228,6 +231,7 @@ HomeFlash::LoadBuffer(unsigned char *p, int max_len)
       if (r + sz > max_len)
           break;
 
+      // Read remaining bytes
       int inc = (sz+1+3)&~3;
       if (inc > 4)
         spi_flash_read(next_page_address+sizeof(flash_page_header)+next_page_offset+4, (unsigned int *)&b.b[4], inc-4);
@@ -238,6 +242,8 @@ HomeFlash::LoadBuffer(unsigned char *p, int max_len)
     }
     if (next_page_address == current_page_address)
       return r|FLASH_END_MARKER;
+
+    next_page_offset = 0;
     if (next_page_address == (FLASH_FIRST*SPI_FLASH_SEC_SIZE)) {
       next_page_address = FLASH_LAST*SPI_FLASH_SEC_SIZE;
     } else {
