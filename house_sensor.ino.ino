@@ -125,7 +125,9 @@ CaptiveConfig *configGetter(nullptr);
 /// Similarly, DataUploader is used for uploading data over WiFi
 DataUploader *dataUploader(nullptr);
 
-#define UPLOAD_BUFFER_SIZE 256
+// Needs to be at least 256 bytes to take a full record from HomeFlash
+#define UPLOAD_BUFFER_SIZE 8 * 256
+
 /// For passing data between flash and the DataUploader instance
 uint8_t *uploadBuf(nullptr);
 
@@ -889,7 +891,7 @@ loop() {
             delete dataUploader;
             dataUploader = nullptr;
 
-            delete uploadBuf;
+            delete [] uploadBuf;
 
             enter_deep_sleep();
             return;
