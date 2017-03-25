@@ -19,7 +19,7 @@ struct StaticAPInfo
 #pragma GCC diagnostic push
 // warning: deprecated conversion from string constant to 'char*'
 #pragma GCC diagnostic ignored "-Wwrite-strings"
-StaticAPInfo staticAPs[]{ {"Wicked",  "", ""},
+StaticAPInfo staticAPs[]{ {"Wicked Networks",  "", "http://google.com/"},
                           {"Library", "", ""} };
 #pragma GCC diagnostic pop
 
@@ -96,10 +96,15 @@ bool DataUploader::isDone()
             }
 
         case DataUploaderState::REGISTERING:
-            if( haveLoginUrl() ) {
+            if( getLoginUrl() ) {
                 HTTPClient c;
-                c.begin(staticAPs[nextAPIndex].loginUrl);
-                c.GET();
+                c.begin( getLoginUrl() );
+                Serial.print("Response code: ");
+                Serial.println( c.GET() );
+                for(size_t i(0); i < c.headers(); ++i)
+                    Serial.println(c.header(i));
+                Serial.println("Got:");
+                Serial.println(c.getString());
                 c.end();
             }
             state = DataUploaderState::UPLOADING;
@@ -160,12 +165,17 @@ void DataUploader::tryNextAp()
 }
 
 
-bool DataUploader::haveLoginUrl() const
+const char * DataUploader::getLoginUrl() const
 {
-    if( nextAPIndex == -1 || nextAPIndex == sizeof(staticAPs) )
-        return false;
+    auto apIndex(nextAPIndex - 1);
 
-    return strlen(staticAPs[nextAPIndex].loginUrl) > 0;
+    if( apIndex == -1 || apIndex == sizeof(staticAPs) )
+        return nullptr;
+
+    if( strlen(staticAPs[apIndex].loginUrl) > 0)
+        return staticAPs[apIndex].loginUrl;
+    else
+        return nullptr;
 }
 
 

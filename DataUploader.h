@@ -39,8 +39,8 @@ class DataUploader
         /// Called after we've connected to WiFi, returns true if successful.
         bool doUpload();
 
-        /// Returns true when there's a login URL to be loaded
-        bool haveLoginUrl() const;
+        /// Returns the login URL for the current AP, or nullptr none exists.
+        const char * getLoginUrl() const;
 
         static void wifiConnectCb(const WiFiEventStationModeConnected &);
         static void wifiDisconnectCb(const WiFiEventStationModeDisconnected &);
